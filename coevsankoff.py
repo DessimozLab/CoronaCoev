@@ -174,7 +174,6 @@ def mat_creator(retq,matsize,iolock):
             break
         col,events = r
         #import pdb; pdb.set_trace()
-
         M1[np.nonzero(events)[0] ,col] = 1
         if count == 0:
             with iolock:
@@ -188,7 +187,6 @@ def mat_creator(retq,matsize,iolock):
                 with open( 'coevmat.pkl' , 'wb') as coevout:
                     coevout.write(pickle.dumps(M1))
                 print('done')
-
 
 def main():
     NCORE = 60

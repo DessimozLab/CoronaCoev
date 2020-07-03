@@ -23,13 +23,16 @@ import h5py
 from Bio import AlignIO
 import dendropy
 
+
+
+
 recalc_sites = False
 NCORE = 55
 
-startk , startl = ( 6100, 8700 )
+startk , startl = ( 0, 0 )
 
 
-print('mod3')
+print('mod7')
 
 
 
@@ -51,12 +54,12 @@ print(dir(tree))
 for l in tree.leaf_nodes()[0:10]:
     print(l)
 
-msa = AlignIO.read('./UKdata/cog_2020-05-08_alignment.fasta' , format = 'fasta')
+msa = AlignIO.read('./gisaid/msa_0612.fasta' , format = 'fasta')
 print(msa)
 align_array = np.array([list(rec) for rec in msa], np.character)
 print(align_array)
-meta_data = pd.read_csv('UKdata/cog_2020-05-08_metadata.csv')
-print(meta_data)
+#meta_data = pd.read_csv('UKdata/cog_2020-05-08_metadata.csv')
+#print(meta_data)
 
 
 """
@@ -140,7 +143,7 @@ def mat_creator(retq,matsize,iolock):
     distmat = np.zeros((matsize,matsize))
     count = 0
 
-    with h5py.File('./UKdata/alnMI2.h5', 'a') as hf:
+    with h5py.File('./gisaid/alnMI2.h5', 'a') as hf:
         try:
             hf.create_dataset("alnMI",  data=distmat)
         except:
