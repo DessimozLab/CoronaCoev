@@ -16,22 +16,36 @@ import multiprocessing as mp
 import copy
 import sys
 import os
+import itertools
 
 sys.setrecursionlimit( 10 **5 )
 
-runName = 'COEV_cleantree_mk4'
+runName = 'COEV_cleantree_mk6'
+NCORE = 10
+treefile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
+alnfile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
 
-NCORE = 50
-treefile = '/home/cactuskid13/covid/lucy_mk2/30_07_2020/gisaid_hcov-2020_07_30.QC.NSoutlier.filter.deMaiomask.aln.EPIID.HF.treefile'
-alnfile = '/home/cactuskid13/covid/lucy_mk2/30_07_2020/gisaid_hcov-2020_07_30.QC.NSoutlier.filter.deMaiomask.EPIID.HF.noambig.HomoplasyFinder_input.aln'
+#fraction of genomes to remove if bootstrap is required
+bootstrap = .1
+
+#number of replicates
+bootstrap_replicates = 20
+
+#keep track of transitions and not just events as binary
+transition_matrices = True
 
 
-print('mk5')
 
+allowed_symbols = { b'A', b'C', b'G' , b'T' }
+allowed_transitions = [ c1+c2 for c1 in allowed_symbols for c2 in allowed_symbols  if c1!= c2]
+print(allowed_transitions)
+transition_dict = {  c : i  for i,c in enumerate( allowed_transitions )  }
+print( transition_dict)
+
+print('mk6')
 tree = dendropy.Tree.get(
     path=treefile,
     schema='newick')
-
 
 msa = AlignIO.read(alnfile , format = 'fasta')
 if os.path.exists(alnfile +'.h5'):
@@ -48,58 +62,44 @@ else:
     print('done')
 
 sites = {}
-
 for col in range(align_array.shape[1]):
-    if col% 1000  == 0:
+    if col % 1000  == 0:
         print(col)
     (unique, counts) = np.unique(align_array[:,col].ravel() , return_counts=True)
     sites.update({col:dict(zip(list(unique), list(counts)))})
-informativesites = [ s for s in sites if len(set( sites[s].keys()) -set([b'-',b'N']) ) > 2  ]
+informativesites = [ s for s in sites if len( set( sites[s].keys()) -set([b'-',b'N']) ) > 1  ]
 print(len(informativesites))
 
-for l in tree.leaf_nodes()[0:10]:
-    print(str(l.taxon))
 
-for i in range(10):
-    print(align_array[i,:])
 
 def clipID(ID):
     return ID.replace('|',' ').replace('_',' ').replace('/',' ').strip()
 
+
 IDs = {i:clipID(rec.id) for i,rec in enumerate(msa)}
+
 #IDs = {i:rec.id for i,rec in enumerate(msa)}
 IDindex = dict(zip( IDs.values() , IDs.keys() ) )
 
 print( [(t,IDindex[t]) for t in list(IDindex.keys())[0:10]] )
 
-print('rev3')
+
 import pdb; pdb.set_trace()
 
 
-#def clipID(ID):
-#    return ''.join( [ s +'|' for s in str(ID).split('|')[:-1] ])[:-1].replace('_',' ')
-
-#def clipID(ID):
-#    return ID.replace('|',' ').replace('_',' ').replace('/',' ').strip()
-
-
- #'msa :::: hCoV-19/Iceland/447/2020|EPI_ISL_424471|2020-03-20'
-
-# 'tree :::: hCoV-19 Scotland EDB399 2020 EPI ISL 425998 2020-03-30'
-
-#prep tree for sankoff
 for i,n in enumerate(tree.nodes()):
     n.matrow = i
     n.symbols = None
     n.scores = None
     n.event = None
     n.char = None
+    n.eventype = None
+
 matsize = len(tree.nodes())
 print(matsize)
 print('nodes')
-#sites = { col: Counter( msa[:,col] ) for col in range(len(msa[1,:])) }
-#place an event on a column with multiple symbols
-allowed_symbols = { b'A', b'C', b'G' , b'T' }
+
+
 
 def process_node_smallpars_1(node):
     #go from leaves up and generate character sets
@@ -134,12 +134,15 @@ def process_node_smallpars_2(node):
                     node.event = 0
                 else:
                     node.event = 1
+                    node.eventype = transition_dict[node.parent_node.char+node.char]
         else:
             node.event = 0
         for child in node.child_nodes():
             if child.char is None:
                 process_node_smallpars_2(child)
+
 def calculate_small_parsimony( t, aln_column , row_index , verbose  = True ):
+
     missing = 0
     #assign leaf values
     for l in t.leaf_nodes():
@@ -162,8 +165,6 @@ def calculate_small_parsimony( t, aln_column , row_index , verbose  = True ):
         l.char = min(l.scores, key=l.scores.get)
     if verbose == True:
         print('done init')
-
-        
         print(missing)
         print('missing in aln')
         for n in t.leaf_nodes()[0:5]:
@@ -173,32 +174,34 @@ def calculate_small_parsimony( t, aln_column , row_index , verbose  = True ):
             print(n.char)
             print(n.event)
 
-
     #up
     process_node_smallpars_1(t.seed_node)
+
     #down
     process_node_smallpars_2(t.seed_node)
 
-    eventindex = [ n.matrow for n in t.nodes()   if n.event > 0 ]
+    eventindex = [ n.matrow for n in t.nodes() if n.event > 0 ]
+    eventtypes = [ n.eventype for n in t.nodes() if n.event > 0 ]
     if verbose == True:
         print(eventindex)
+        print(eventtypes)
+    return (eventindex,eventtypes)
 
-    events = np.zeros( (len(t.nodes()),1) )
-    events[eventindex] = 1
-    return events
-
-def process(q,retq, iolock ,tree , IDindex   ):
+def process( q , retq, iolock , tree , IDindex ):
     #calculate tree events
     with iolock:
         print('init worker')
     count = 0
+    init = False
     while True:
         stuff = q.get()
-        if stuff is None:
+        if stuff is None and init == True:
             break
         index,aln_column = stuff
+        #first data received
 
-        retq.put((index,calculate_small_parsimony( copy.deepcopy(tree) , aln_column , IDindex ) ) )
+        init = True
+        retq.put( ( index , calculate_small_parsimony( copy.deepcopy(tree) , aln_column , IDindex ) ) )
         if count % 1000 == 0:
             with iolock:
                 print(index)
@@ -211,44 +214,69 @@ def mat_creator(retq,matsize,iolock,runName = ''):
         print('init matcreator')
     #collect distances and create final mat
     #distmat = np.zeros(  )
-    M1 = sparse.lil_matrix((matsize[0],matsize[1] ))
+    if transition_matrices == True:
+        transiton_sparsemats = {}
+        for c in transition_dict:
+            transiton_sparsemats[transition_dict[c]] = sparse.lil_matrix((matsize[0],matsize[1] ))
+    else:
+        M1 = sparse.lil_matrix((matsize[0],matsize[1] ))
+
     count = 0
+
     init = False
+
     t0 = time.time()
+
     while True:
         r = retq.get()
         if r is not None:
             init = True
-
         count+=1
         if r is None and init == True:
             break
         col,events = r
-        M1[np.nonzero(events)[0] ,col] = 1
+        #first data received
+        init = True
+
+        eventindex,eventtypes = events
+        if transition_matrices == True:
+            #find unique transitions
+            transition_types = np.unique(eventtypes)[0]
+            for e in transition_types[0]:
+                typeindex = np.where( eventtypes == e )[0]
+                transiton_sparsemats[e][ typeindex[0] : col] = 1
+        else:
+            M1[eventindex,col] = 1
+
         if count == 0:
             with iolock:
-                print(np.nonzero(events))
+                print(eventindex)
         if time.time()-t0> 120 :
             t0 = time.time()
             with iolock:
                 print('saving')
                 print(col)
-                print(np.nonzero(events))
-
-                with open( runName + 'coevmatrev3.pkl' , 'wb') as coevout:
-                    coevout.write(pickle.dumps(M1))
+                print(eventindex)
+                if transition_matrices == True:
+                    with open( runName + 'coevmat_transitionmatrices.pkl' , 'wb') as coevout:
+                        coevout.write(pickle.dumps(M1))
+                else:
+                    with open( runName + 'coevmat.pkl' , 'wb') as coevout:
+                        coevout.write(pickle.dumps(M1))
                 print('done')
 
-def main():
+
 
 
     #reset tree
+def main(runName , align_array , bootstrap = None ):
     for i,n in enumerate(tree.nodes()):
         n.matrow = i
         n.symbols = None
         n.scores = None
         n.event = None
         n.char = None
+        n.eventype = None
     #our results will be events on tree nodes for each column
     matsize = (len(tree.nodes()),align_array.shape[1])
     q = mp.Queue(maxsize=NCORE*1000)
@@ -259,16 +287,33 @@ def main():
     #start saver
     p = mp.Process(target=mat_creator, args=(retq,matsize, iolock, alnfile + runName ))
     p.start()
+
+    if bootstrap:
+        #select portion of random genomes to take out
+        del_genomes = np.random.randint( align_array.shape[0], size= int(align_array.shape*bootstrap) )
     for i,k in enumerate(informativesites):
         s1 = align_array[:,k]
+        if bootstrap:
+            #change characters of random genomes to N
+            s1[del_genomes] = b'N'
         q.put( (k,s1) )
-    for _ in range(NCORE):  # tell workers we're done
+    for _ in range(2*NCORE):  # tell workers we're done
         q.put(None)
-    #retq.put(None)
+    retq.put(None)
+
     pool.close()
     pool.join()
-    #retq.put(None)
     p.join()
 
+    del q
+    del retq
+
+    print('DONE!')
+
 if __name__ == '__main__':
-    main()
+    if bootstrap:
+        #remove some genomes to see if the result is affected
+        for strap in range(replicates):
+            main(runName+"full" , align_array)
+    else:
+        main(runName+"full" , align_array )
