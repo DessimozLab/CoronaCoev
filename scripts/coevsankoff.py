@@ -34,8 +34,6 @@ bootstrap_replicates = 20
 #keep track of transitions and not just events as binary
 transition_matrices = True
 
-
-
 allowed_symbols = { b'A', b'C', b'G' , b'T' }
 allowed_transitions = [ c1+c2 for c1 in allowed_symbols for c2 in allowed_symbols  if c1!= c2]
 print(allowed_transitions)
@@ -141,7 +139,7 @@ def process_node_smallpars_2(node):
             if child.char is None:
                 process_node_smallpars_2(child)
 
-def calculate_small_parsimony( t, aln_column , row_index , verbose  = True ):
+def calculate_small_parsimony( t, aln_column , row_index , verbose  = False ):
 
     missing = 0
     #assign leaf values
@@ -209,7 +207,7 @@ def process( q , retq, iolock , tree , IDindex ):
         count+= 1
     print('done')
 
-def mat_creator(retq,matsize,iolock,runName = ''):
+def mat_creator(retq,matsize,iolock,verbose = True, runName = ''):
     with iolock:
         print('init matcreator')
     #collect distances and create final mat
@@ -220,13 +218,9 @@ def mat_creator(retq,matsize,iolock,runName = ''):
             transiton_sparsemats[transition_dict[c]] = sparse.lil_matrix((matsize[0],matsize[1] ))
     else:
         M1 = sparse.lil_matrix((matsize[0],matsize[1] ))
-
     count = 0
-
     init = False
-
     t0 = time.time()
-
     while True:
         r = retq.get()
         if r is not None:
@@ -235,41 +229,45 @@ def mat_creator(retq,matsize,iolock,runName = ''):
         if r is None and init == True:
             break
         col,events = r
+
+
         #first data received
         init = True
 
         eventindex,eventtypes = events
-        if transition_matrices == True:
-            #find unique transitions
-            transition_types = np.unique(eventtypes)[0]
-            for e in transition_types[0]:
-                typeindex = np.where( eventtypes == e )[0]
-                transiton_sparsemats[e][ typeindex[0] : col] = 1
-        else:
-            M1[eventindex,col] = 1
+        if len(eventindex)>0:
+            if verbose == True:
+                print( eventindex , eventtypes)
 
-        if count == 0:
-            with iolock:
-                print(eventindex)
+            if transition_matrices == True:
+                #find unique transitions
+                transition_types = np.unique(eventtypes)
+
+                if verbose == True:
+                    print(transition_types)
+
+                for e in list(transition_types):
+                    typeindex = np.where( eventtypes == e )[0]
+                    if verbose == True:
+                        print('typeindex' , typeindex)
+                    transiton_sparsemats[e][ typeindex[0] : col] = 1
+            else:
+                M1[eventindex,col] = 1
         if time.time()-t0> 120 :
             t0 = time.time()
             with iolock:
                 print('saving')
-                print(col)
-                print(eventindex)
                 if transition_matrices == True:
                     with open( runName + 'coevmat_transitionmatrices.pkl' , 'wb') as coevout:
-                        coevout.write(pickle.dumps(M1))
+                        coevout.write(pickle.dumps(transiton_sparsemats))
                 else:
                     with open( runName + 'coevmat.pkl' , 'wb') as coevout:
                         coevout.write(pickle.dumps(M1))
                 print('done')
 
-
-
-
-    #reset tree
 def main(runName , align_array , bootstrap = None ):
+        #reset tree
+
     for i,n in enumerate(tree.nodes()):
         n.matrow = i
         n.symbols = None
@@ -290,7 +288,7 @@ def main(runName , align_array , bootstrap = None ):
 
     if bootstrap:
         #select portion of random genomes to take out
-        del_genomes = np.random.randint( align_array.shape[0], size= int(align_array.shape*bootstrap) )
+        del_genomes = np.random.randint( align_array.shape[0], size= int(align_array.shape[0]*bootstrap) )
     for i,k in enumerate(informativesites):
         s1 = align_array[:,k]
         if bootstrap:
@@ -313,7 +311,9 @@ def main(runName , align_array , bootstrap = None ):
 if __name__ == '__main__':
     if bootstrap:
         #remove some genomes to see if the result is affected
-        for strap in range(replicates):
-            main(runName+"full" , align_array)
+        for strap in range(bootstrap_replicates):
+            main(runName+"full" , align_array , bootstrap)
+    ## TODO: merge bootstrap replicates into one event mat
+
     else:
         main(runName+"full" , align_array )
