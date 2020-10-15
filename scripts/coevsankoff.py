@@ -5,7 +5,7 @@ import pandas as pd
 from Bio import SeqIO
 import pandas as pd
 from colour import Color
-import pickle
+import dill as pickle
 import time
 import h5py
 import dendropy
@@ -19,15 +19,13 @@ import os
 import itertools
 
 sys.setrecursionlimit( 10 **5 )
-
 runName = 'COEV_cleantree_mk6'
-NCORE = 10
+NCORE = 60
 treefile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
 alnfile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
 
-#fraction of genomes to remove if bootstrap is required
-bootstrap = .1
-
+#fraction of genomes to remove if jackknifing
+bootstrap = .33
 #number of replicates
 bootstrap_replicates = 20
 
@@ -40,7 +38,7 @@ print(allowed_transitions)
 transition_dict = {  c : i  for i,c in enumerate( allowed_transitions )  }
 print( transition_dict)
 
-print('mk6')
+print('mk7')
 tree = dendropy.Tree.get(
     path=treefile,
     schema='newick')
@@ -55,6 +53,7 @@ else:
     align_array = np.array([ list(rec.upper())  for rec in msa], np.character)
     print('done')
     print('dumping to hdf5')
+
     with h5py.File(alnfile +'.h5', 'w') as hf:
         hf.create_dataset("MSA2array",  data=align_array)
     print('done')
@@ -82,7 +81,6 @@ IDindex = dict(zip( IDs.values() , IDs.keys() ) )
 print( [(t,IDindex[t]) for t in list(IDindex.keys())[0:10]] )
 
 
-import pdb; pdb.set_trace()
 
 
 for i,n in enumerate(tree.nodes()):
@@ -139,7 +137,7 @@ def process_node_smallpars_2(node):
             if child.char is None:
                 process_node_smallpars_2(child)
 
-def calculate_small_parsimony( t, aln_column , row_index , verbose  = False ):
+def calculate_small_parsimony( t, aln_column , row_index , iolock, verbose  = False ):
 
     missing = 0
     #assign leaf values
@@ -159,18 +157,20 @@ def calculate_small_parsimony( t, aln_column , row_index , verbose  = False ):
             char = None
             l.symbols =  allowed_symbols
             if verbose == True:
-                print( 'err ! alncol: ', l.taxon , aln_column  )
+                with iolock:
+                    print( 'err ! alncol: ', l.taxon , aln_column  )
         l.char = min(l.scores, key=l.scores.get)
     if verbose == True:
-        print('done init')
-        print(missing)
-        print('missing in aln')
-        for n in t.leaf_nodes()[0:5]:
-            print(n)
-            print(n.symbols)
-            print(n.scores)
-            print(n.char)
-            print(n.event)
+        with iolock:
+            print('done init')
+            print(missing)
+            print('missing in aln')
+            for n in t.leaf_nodes()[0:5]:
+                print(n)
+                print(n.symbols)
+                print(n.scores)
+                print(n.char)
+                print(n.event)
 
     #up
     process_node_smallpars_1(t.seed_node)
@@ -181,8 +181,9 @@ def calculate_small_parsimony( t, aln_column , row_index , verbose  = False ):
     eventindex = [ n.matrow for n in t.nodes() if n.event > 0 ]
     eventtypes = [ n.eventype for n in t.nodes() if n.event > 0 ]
     if verbose == True:
-        print(eventindex)
-        print(eventtypes)
+        with iolock:
+            print(eventindex)
+            print(eventtypes)
     return (eventindex,eventtypes)
 
 def process( q , retq, iolock , tree , IDindex ):
@@ -197,9 +198,8 @@ def process( q , retq, iolock , tree , IDindex ):
             break
         index,aln_column = stuff
         #first data received
-
         init = True
-        retq.put( ( index , calculate_small_parsimony( copy.deepcopy(tree) , aln_column , IDindex ) ) )
+        retq.put( ( index , calculate_small_parsimony( copy.deepcopy(tree) , aln_column , IDindex , iolock ) ) )
         if count % 1000 == 0:
             with iolock:
                 print(index)
@@ -207,67 +207,81 @@ def process( q , retq, iolock , tree , IDindex ):
         count+= 1
     print('done')
 
-def mat_creator(retq,matsize,iolock,verbose = True, runName = ''):
+def mat_creator(retq,matsize,iolock, runName, datasize , verbose = False , restart = None ):
+    runtime = time.time()
     with iolock:
         print('init matcreator')
-    #collect distances and create final mat
-    #distmat = np.zeros(  )
-    if transition_matrices == True:
-        transiton_sparsemats = {}
-        for c in transition_dict:
-            transiton_sparsemats[transition_dict[c]] = sparse.lil_matrix((matsize[0],matsize[1] ))
+        print(runName)
+    if restart == True:
+        if transition_matrices == True:
+            with open(restart, 'rb') as pklin:
+                count, transiton_sparsemats.loads(pklin.read())
+        else:
+            with open(restart, 'rb') as pklin:
+                count , M1 = pickle.loads(pklin.read())
     else:
-        M1 = sparse.lil_matrix((matsize[0],matsize[1] ))
-    count = 0
+        count = 0
+        if transition_matrices == True:
+            transiton_sparsemats = {}
+            for c in transition_dict:
+                transiton_sparsemats[transition_dict[c]] = sparse.csc_matrix((matsize[0],matsize[1] ) ,dtype=np.int32)
+        else:
+            M1 = sparse.csc_matrix((matsize[0],matsize[1]) , dtype=np.int32 )
     init = False
     t0 = time.time()
     while True:
         r = retq.get()
-        if r is not None:
-            init = True
         count+=1
-        if r is None and init == True:
-            break
         col,events = r
-
-
-        #first data received
-        init = True
-
         eventindex,eventtypes = events
         if len(eventindex)>0:
             if verbose == True:
                 print( eventindex , eventtypes)
-
             if transition_matrices == True:
-                #find unique transitions
                 transition_types = np.unique(eventtypes)
-
                 if verbose == True:
                     print(transition_types)
-
                 for e in list(transition_types):
                     typeindex = np.where( eventtypes == e )[0]
-                    if verbose == True:
-                        print('typeindex' , typeindex)
-                    transiton_sparsemats[e][ typeindex[0] : col] = 1
+                    print(typeindex)
+                    selectrows = np.array(eventindex)[typeindex]
+                    transiton_sparsemats[e]  += sparse.csc_matrix( ( np.ones(len(selectrows))  , (selectrows , np.ones(len(selectrows )) * col ) ) , shape= (matsize[0] , matsize[1] ) ,  dtype = np.int32 )
             else:
-                M1[eventindex,col] = 1
-        if time.time()-t0> 120 :
+                M1 += sparse.csc_matrix( ( np.ones(len(eventindex))  , (eventindex , np.ones(len(eventindex)) * col ) ) , shape= (matsize[0] , matsize[1] ) ,  dtype = np.int32 )
+        if count == datasize:
+            with iolock:
+                print('final save')
+                print( time.time()- runtime )
+                if transition_matrices == True:
+                    for transition in transiton_sparsemats:
+                        print( 'saving ' , transition)
+                        with open( runName + str(transition)+ '_coevmat_transitionmatrices.pkl' , 'wb') as coevout:
+                            transiton_sparsemats[transition].sum_duplicates()
+                            coevout.write(pickle.dumps((count,transiton_sparsemats[transition])))
+                else:
+                    with open( runName + 'coevmat.pkl' , 'wb') as coevout:
+                        coevout.write(pickle.dumps((count,M1)))
+                print('DONE')
+            return
+        if time.time()-t0> 1200:
             t0 = time.time()
             with iolock:
                 print('saving')
+                print( time.time()- runtime )
                 if transition_matrices == True:
-                    with open( runName + 'coevmat_transitionmatrices.pkl' , 'wb') as coevout:
-                        coevout.write(pickle.dumps(transiton_sparsemats))
+                    for transition in transiton_sparsemats:
+                        print( 'saving ' , transition)
+                        with open( runName + str(transition)+ '_coevmat_transitionmatrices.pkl' , 'wb') as coevout:
+                            transiton_sparsemats[transition].sum_duplicates()
+                            coevout.write(pickle.dumps((count,transiton_sparsemats[transition])))
                 else:
                     with open( runName + 'coevmat.pkl' , 'wb') as coevout:
-                        coevout.write(pickle.dumps(M1))
+                        M1.sum_duplicates()
+                        coevout.write(pickle.dumps((count,M1)))
                 print('done')
 
-def main(runName , align_array , bootstrap = None ):
-        #reset tree
-
+def main(runName , align_array , replicates = None, bootstrap = None , restart = None ):
+    #reset tree
     for i,n in enumerate(tree.nodes()):
         n.matrow = i
         n.symbols = None
@@ -283,37 +297,50 @@ def main(runName , align_array , bootstrap = None ):
     #start workers
     pool = mp.Pool(NCORE, initializer=process, initargs=(q,retq, iolock ,tree , IDindex ))
     #start saver
-    p = mp.Process(target=mat_creator, args=(retq,matsize, iolock, alnfile + runName ))
-    p.start()
+    outname = alnfile + runName
+    if bootstrap:
+        outname+='bootstrap_run'
 
     if bootstrap:
-        #select portion of random genomes to take out
-        del_genomes = np.random.randint( align_array.shape[0], size= int(align_array.shape[0]*bootstrap) )
-    for i,k in enumerate(informativesites):
-        s1 = align_array[:,k]
-        if bootstrap:
-            #change characters of random genomes to N
-            s1[del_genomes] = b'N'
-        q.put( (k,s1) )
+        #rerun analysis here
+        datasize = replicates * len( informativesites )
+
+        p = mp.Process( target=mat_creator, args=(retq,matsize, iolock, outname , datasize , restart ))
+        p.start()
+
+        for n in range(replicates):
+            #select portion of random genomes to take out
+            del_genomes = np.random.randint( align_array.shape[0], size= int(align_array.shape[0]*bootstrap) )
+            for i,k in enumerate(informativesites):
+                s1 = align_array[:,k]
+                #change characters of random genomes to N
+                s1[del_genomes] = b'N'
+                q.put( (k,s1) )
+
+    else:
+        datasize = len( informativesites )
+        p = mp.Process(target=mat_creator, args=(retq,matsize, iolock, outname, datasize ))
+        p.start()
+        for i,k in enumerate(informativesites):
+            s1 = align_array[:,k]
+            q.put( (k,s1) )
     for _ in range(2*NCORE):  # tell workers we're done
         q.put(None)
-    retq.put(None)
-
     pool.close()
     pool.join()
+    print('workers done')
+    for _ in range(2*NCORE):  # tell workers we're done
+        retq.put(None)
     p.join()
-
+    print('saver done')
     del q
     del retq
-
     print('DONE!')
 
 if __name__ == '__main__':
     if bootstrap:
-        #remove some genomes to see if the result is affected
-        for strap in range(bootstrap_replicates):
-            main(runName+"full" , align_array , bootstrap)
+        main(runName+'bootstrap_run' , align_array , bootstrap_replicates , bootstrap , restart = restart )
     ## TODO: merge bootstrap replicates into one event mat
 
     else:
-        main(runName+"full" , align_array )
+        main(runName+"full" , align_array , restart = restart )
