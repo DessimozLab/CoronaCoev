@@ -18,34 +18,27 @@ import sys
 import os
 import itertools
 
-
-print('mk8')
-
 sys.setrecursionlimit( 10 **5 )
 runName = 'COEV_cleantree_mk6'
 NCORE = 60
 treefile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
 alnfile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
 
-#use blast based annotation to assign codons to column ranges
-annotation = pd.read_csv( alnfile +'annotation.csv' )
-
-
 #fraction of genomes to remove if jackknifing
 bootstrap = .33
 #number of replicates
-bootstrap_replicates = 5
+bootstrap_replicates = 20
 
 #keep track of transitions and not just events as binary
 transition_matrices = True
 
 allowed_symbols = { b'A', b'C', b'G' , b'T' }
-
 allowed_transitions = [ c1+c2 for c1 in allowed_symbols for c2 in allowed_symbols  if c1!= c2]
 print(allowed_transitions)
 transition_dict = {  c : i  for i,c in enumerate( allowed_transitions )  }
 print( transition_dict)
 
+print('mk7')
 tree = dendropy.Tree.get(
     path=treefile,
     schema='newick')
@@ -65,31 +58,15 @@ else:
         hf.create_dataset("MSA2array",  data=align_array)
     print('done')
 
-
-#find all sites with mutations
 sites = {}
 for col in range(align_array.shape[1]):
     if col % 1000  == 0:
         print(col)
     (unique, counts) = np.unique(align_array[:,col].ravel() , return_counts=True)
     sites.update({col:dict(zip(list(unique), list(counts)))})
-informativesites = set([ s for s in sites if len( set( sites[s].keys()) -set([b'-',b'N']) ) > 1  ] )
+informativesites = [ s for s in sites if len( set( sites[s].keys()) -set([b'-',b'N']) ) > 1  ]
 print(len(informativesites))
 
-
-#associate informative sites to a codon
-codon_dict = {}
-
-for i,r in annotation.iterrows():
-    #indexing starts at 1 for blast
-    for j,codon in enumerate(range(r.qstart-1, r.qend-1 , 3 )):
-        for nt in [codon,codon+ 1, codon+2]:
-                if nt in informativesites:
-                    if (codon,codon+2) not in codon_dict:
-                        codon_dict[(codon,codon+2)] = [nt]
-                    else:
-                        codon_dict[(codon,codon+2)] += [nt]
-codon_dict_rev = dict(zip ( codon_dict.values() , codon_dict.keys( ) ) )
 
 
 def clipID(ID):
@@ -129,6 +106,7 @@ def process_node_smallpars_1(node):
         symbols = set.intersection( * [ child.symbols for child in node.child_nodes( ) ] )
         if len(symbols) == 0:
             symbols = set.union( * [ child.symbols for child in node.child_nodes( ) ] )
+
         node.symbols = symbols
         node.scores = { }
         for c in allowed_symbols:
@@ -159,81 +137,53 @@ def process_node_smallpars_2(node):
             if child.char is None:
                 process_node_smallpars_2(child)
 
-def calculate_small_parsimony( t, aln_columns , row_index , iolock, verbose  = False ):
+def calculate_small_parsimony( t, aln_column , row_index , iolock, verbose  = False ):
 
     missing = 0
     #assign leaf values
-    for pos,aln_column in enumerate(aln_columns):
-
-        l.event = {}
-        l.scores = {}
-        l.symbols = {}
-        l.char= {}
-        l.event = {}
-        l.calc = {}
-
-        if type(aln_column) == str:
-            #column has no events
-            l.calc[pos] = False
-            char = aln_column
-            for l in t.leaf_nodes():
-                l.event[pos] = 0
-                l.scores[pos] = { c:10**10 for c in allowed_symbols } )
-                if char.upper() in allowed_symbols:
-                    l.symbols[pos] = { char }
-                    l.scores[pos][char] = 0
-                else:
-                    #ambiguous leaf
-                    l.symbols[pos] = allowed_symbols
+    for l in t.leaf_nodes():
+        l.event = 0
+        l.scores = { c:10**10 for c in allowed_symbols }
+        if str(l.taxon).replace("'", '') in row_index:
+            char = aln_column[row_index[str(l.taxon).replace("'", '')]]
+            if char.upper() in allowed_symbols:
+                l.symbols = { char }
+                l.scores[char] = 0
+            else:
+                #ambiguous leaf
+                l.symbols =  allowed_symbols
         else:
-            #setup for small_pars1
-            l.calc[pos] = True
-
-            for l in t.leaf_nodes():
-                l.event[pos] =0
-                l.scores[pos] = { c:10**10 for c in allowed_symbols }
-
-                if str(l.taxon).replace("'", '') in row_index:
-                    char = aln_column[row_index[str(l.taxon).replace("'", '')] , pos ]
-                    if char.upper() in allowed_symbols:
-                        l.symbols[pos] = { char }
-                        l.scores[pos][char] = 0
-                    else:
-                        #ambiguous leaf
-                        l.symbols[pos] =  allowed_symbols
-                else:
-                    missing += 1
-                    char = None
-                    l.symbols[pos] =  allowed_symbols
-                    if verbose == True:
-                        with iolock:
-                            print( 'err ! alncol: ', l.taxon , aln_column  )
-                l.char[pos] = min(l.scores[pos], key=l.scores.get[pos])
-
-        if verbose == True:
-            with iolock:
-                print('done init')
-                print(missing)
-                print('missing in aln')
-                for n in t.leaf_nodes()[0:5]:
-                    print(n)
-                    print(n.symbols)
-                    print(n.scores)
-                    print(n.char)
-                    print(n.event)
-
-            #up
-            process_node_smallpars_1(t.seed_node)
-
-            #down
-            process_node_smallpars_2(t.seed_node)
-
-            eventindex = [ n.matrow for n in t.nodes() if n.event > 0 ]
-            eventtypes = [ n.eventype for n in t.nodes() if n.event > 0 ]
+            missing += 1
+            char = None
+            l.symbols =  allowed_symbols
             if verbose == True:
                 with iolock:
-                    print(eventindex)
-                    print(eventtypes)
+                    print( 'err ! alncol: ', l.taxon , aln_column  )
+        l.char = min(l.scores, key=l.scores.get)
+    if verbose == True:
+        with iolock:
+            print('done init')
+            print(missing)
+            print('missing in aln')
+            for n in t.leaf_nodes()[0:5]:
+                print(n)
+                print(n.symbols)
+                print(n.scores)
+                print(n.char)
+                print(n.event)
+
+    #up
+    process_node_smallpars_1(t.seed_node)
+
+    #down
+    process_node_smallpars_2(t.seed_node)
+
+    eventindex = [ n.matrow for n in t.nodes() if n.event > 0 ]
+    eventtypes = [ n.eventype for n in t.nodes() if n.event > 0 ]
+    if verbose == True:
+        with iolock:
+            print(eventindex)
+            print(eventtypes)
     return (eventindex,eventtypes)
 
 def process( q , retq, iolock , tree , IDindex ):
@@ -274,7 +224,7 @@ def mat_creator(retq,matsize,iolock, runName, datasize , verbose = False , resta
         if transition_matrices == True:
             transiton_sparsemats = {}
             for c in transition_dict:
-                transiton_sparsemats[c] = sparse.csc_matrix((matsize[0],matsize[1] ) ,dtype=np.int32)
+                transiton_sparsemats[transition_dict[c]] = sparse.csc_matrix((matsize[0],matsize[1] ) ,dtype=np.int32)
         else:
             M1 = sparse.csc_matrix((matsize[0],matsize[1]) , dtype=np.int32 )
     init = False
@@ -321,7 +271,7 @@ def mat_creator(retq,matsize,iolock, runName, datasize , verbose = False , resta
                 if transition_matrices == True:
                     for transition in transiton_sparsemats:
                         print( 'saving ' , transition)
-                        with open( runName +'_transition_' + str(transition)+ '_coevmat.pkl' , 'wb') as coevout:
+                        with open( runName + str(transition)+ '_coevmat_transitionmatrices.pkl' , 'wb') as coevout:
                             transiton_sparsemats[transition].sum_duplicates()
                             coevout.write(pickle.dumps((count,transiton_sparsemats[transition])))
                 else:
@@ -362,10 +312,9 @@ def main(runName , align_array , replicates = None, bootstrap = None , restart =
             #select portion of random genomes to take out
             del_genomes = np.random.randint( align_array.shape[0], size= int(align_array.shape[0]*bootstrap) )
             for i,k in enumerate(informativesites):
-
                 s1 = align_array[:,k]
                 #change characters of random genomes to N
-                s1[del_genomes, :] = b'N'
+                s1[del_genomes] = b'N'
                 q.put( (k,s1) )
 
     else:
