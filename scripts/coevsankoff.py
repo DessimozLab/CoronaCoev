@@ -14,33 +14,33 @@ from scipy import sparse
 import pickle
 import multiprocessing as mp
 import copy
+
 import sys
 import os
+
 import itertools
 
-
-print('mk8')
+print('mk8codon')
 
 sys.setrecursionlimit( 10 **5 )
 runName = 'COEV_cleantree_mk6'
-NCORE = 60
+NCORE = 10
 treefile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
 alnfile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
 
 #use blast based annotation to assign codons to column ranges
 annotation = pd.read_csv( alnfile +'annotation.csv' )
 
-
 #fraction of genomes to remove if jackknifing
 bootstrap = .33
 #number of replicates
-bootstrap_replicates = 5
+bootstrap_replicates = 1
+restart = None
 
 #keep track of transitions and not just events as binary
+
 transition_matrices = True
-
 allowed_symbols = { b'A', b'C', b'G' , b'T' }
-
 allowed_transitions = [ c1+c2 for c1 in allowed_symbols for c2 in allowed_symbols  if c1!= c2]
 print(allowed_transitions)
 transition_dict = {  c : i  for i,c in enumerate( allowed_transitions )  }
@@ -49,6 +49,8 @@ print( transition_dict)
 tree = dendropy.Tree.get(
     path=treefile,
     schema='newick')
+
+
 
 msa = AlignIO.read(alnfile , format = 'fasta')
 if os.path.exists(alnfile +'.h5'):
@@ -60,12 +62,12 @@ else:
     align_array = np.array([ list(rec.upper())  for rec in msa], np.character)
     print('done')
     print('dumping to hdf5')
-
     with h5py.File(alnfile +'.h5', 'w') as hf:
         hf.create_dataset("MSA2array",  data=align_array)
     print('done')
 
 
+print('selecting informative sites')
 #find all sites with mutations
 sites = {}
 for col in range(align_array.shape[1]):
@@ -75,37 +77,34 @@ for col in range(align_array.shape[1]):
     sites.update({col:dict(zip(list(unique), list(counts)))})
 informativesites = set([ s for s in sites if len( set( sites[s].keys()) -set([b'-',b'N']) ) > 1  ] )
 print(len(informativesites))
-
-
+print('done')
 #associate informative sites to a codon
 codon_dict = {}
 
+print( 'grouping codons')
 for i,r in annotation.iterrows():
     #indexing starts at 1 for blast
     for j,codon in enumerate(range(r.qstart-1, r.qend-1 , 3 )):
         for nt in [codon,codon+ 1, codon+2]:
-                if nt in informativesites:
-                    if (codon,codon+2) not in codon_dict:
-                        codon_dict[(codon,codon+2)] = [nt]
-                    else:
-                        codon_dict[(codon,codon+2)] += [nt]
+            if nt in informativesites:
+                if (codon,codon+2) not in codon_dict:
+                    codon_dict[(codon,codon+2)] = (nt,)
+                else:
+                    codon_dict[(codon,codon+2)]+ (nt,)
+print('done')
+
+
+
 codon_dict_rev = dict(zip ( codon_dict.values() , codon_dict.keys( ) ) )
-
-
 def clipID(ID):
     return ID.replace('|',' ').replace('_',' ').replace('/',' ').strip()
 
 
+print('preparing tree')
 IDs = {i:clipID(rec.id) for i,rec in enumerate(msa)}
-
 #IDs = {i:rec.id for i,rec in enumerate(msa)}
 IDindex = dict(zip( IDs.values() , IDs.keys() ) )
-
 print( [(t,IDindex[t]) for t in list(IDindex.keys())[0:10]] )
-
-
-
-
 for i,n in enumerate(tree.nodes()):
     n.matrow = i
     n.symbols = None
@@ -115,9 +114,9 @@ for i,n in enumerate(tree.nodes()):
     n.eventype = None
 
 matsize = len(tree.nodes())
+print('done')
 print(matsize)
 print('nodes')
-
 
 
 def process_node_smallpars_1(node):
@@ -126,75 +125,76 @@ def process_node_smallpars_1(node):
         for child in node.child_nodes():
             if child.symbols is None:
                 process_node_smallpars_1(child)
-        symbols = set.intersection( * [ child.symbols for child in node.child_nodes( ) ] )
-        if len(symbols) == 0:
-            symbols = set.union( * [ child.symbols for child in node.child_nodes( ) ] )
-        node.symbols = symbols
-        node.scores = { }
-        for c in allowed_symbols:
-            if c not in node.symbols:
-                #add trnasition mat here if needed
-                score = min(  [ child.scores[c] for child in node.child_nodes()])+1
-            else:
-                score = min(  [ child.scores[c] for child in node.child_nodes() ] )
-            node.scores[c] = score
+        for pos in [0,1,2]:
+            symbols = set.intersection( * [ child.symbols[pos] for child in node.child_nodes( ) ] )
+            if len(symbols) == 0:
+                symbols = set.union( * [ child.symbols[pos] for child in node.child_nodes( ) ] )
+            node.symbols[pos] = symbols
+            node.scores[pos] = { }
+            for c in allowed_symbols:
+                if c not in node.symbols[pos]:
+                    #add trnasition mat here if needed
+                    score = min(  [ child.scores[pos][c] for child in node.child_nodes()])+1
+                else:
+                    score = min(  [ child.scores[pos][c] for child in node.child_nodes() ] )
+                node.scores[pos][c] = score
 
 def process_node_smallpars_2(node):
     #assign the most parsimonious char from children
     if node.char is None:
-        node.char = min(node.scores, key=node.scores.get)
-        if node.parent_node:
-            if node.parent_node.char == node.char:
-                node.event = 0
-            else:
-                if node.scores[node.parent_node.char] == node.scores[node.char] :
-                    node.char = node.parent_node.char
-                    node.event = 0
+        ancestral_AA = seq(''.join([ node.parent_node.char[pos] for pos in [0,1,2] ]).translate() )
+        for pos in [0,1,2]:
+            node.char[pos] = min(node.scores[pos], key=node.scores[pos].get)
+
+            if node.parent_node[pos]:
+                if node.parent_node.char[pos] == node.char[pos]:
+                    node.event[pos] = 0
                 else:
-                    node.event = 1
-                    node.eventype = transition_dict[node.parent_node.char+node.char]
-        else:
-            node.event = 0
+                    if node.scores[pos][node.parent_node.char] == node.scores[pos][node.char] :
+                        node.char[pos] = node.parent_node.char[pos]
+                        node.event[pos] = 0
+                    else:
+                        node.event[pos] = 1
+                        node.eventype[pos] = transition_dict[node.parent_node.char+node.char]
+
+            else:
+                node.event[pos] = 0
+        AA = seq(''.join([ node.char[pos] for pos in [0,1,2] ]).translate())
+        if AA != ancestral_AA:
+            node.AAevent = 1
+        #down on level
         for child in node.child_nodes():
             if child.char is None:
                 process_node_smallpars_2(child)
 
-def calculate_small_parsimony( t, aln_columns , row_index , iolock, verbose  = False ):
+def calculate_small_parsimony( t, aln_columns , row_index , iolock, verbose  = True ):
 
     missing = 0
     #assign leaf values
-    for pos,aln_column in enumerate(aln_columns):
+    print(aln_columns)
+    for pos,col in enumerate(aln_columns):
 
-        l.event = {}
-        l.scores = {}
-        l.symbols = {}
-        l.char= {}
-        l.event = {}
-        l.calc = {}
-
-        if type(aln_column) == str:
-            #column has no events
-            l.calc[pos] = False
-            char = aln_column
-            for l in t.leaf_nodes():
+        for l in t.leaf_nodes():
+            if hasattr(col , 'decode'):
+                #column has no events
+                l.calc[pos] = False
+                char = col
                 l.event[pos] = 0
-                l.scores[pos] = { c:10**10 for c in allowed_symbols } )
+                l.scores[pos] = { c:10**10 for c in allowed_symbols }
                 if char.upper() in allowed_symbols:
                     l.symbols[pos] = { char }
                     l.scores[pos][char] = 0
                 else:
                     #ambiguous leaf
                     l.symbols[pos] = allowed_symbols
-        else:
-            #setup for small_pars1
-            l.calc[pos] = True
-
-            for l in t.leaf_nodes():
+            else:
+                #setup for small_pars1
+                l.calc[pos] = True
                 l.event[pos] =0
                 l.scores[pos] = { c:10**10 for c in allowed_symbols }
 
                 if str(l.taxon).replace("'", '') in row_index:
-                    char = aln_column[row_index[str(l.taxon).replace("'", '')] , pos ]
+                    char = col[ row_index[str(l.taxon).replace("'", '')]  ]
                     if char.upper() in allowed_symbols:
                         l.symbols[pos] = { char }
                         l.scores[pos][char] = 0
@@ -205,36 +205,37 @@ def calculate_small_parsimony( t, aln_columns , row_index , iolock, verbose  = F
                     missing += 1
                     char = None
                     l.symbols[pos] =  allowed_symbols
+
                     if verbose == True:
                         with iolock:
                             print( 'err ! alncol: ', l.taxon , aln_column  )
-                l.char[pos] = min(l.scores[pos], key=l.scores.get[pos])
-
-        if verbose == True:
-            with iolock:
-                print('done init')
-                print(missing)
-                print('missing in aln')
-                for n in t.leaf_nodes()[0:5]:
-                    print(n)
-                    print(n.symbols)
-                    print(n.scores)
-                    print(n.char)
-                    print(n.event)
-
-            #up
-            process_node_smallpars_1(t.seed_node)
-
-            #down
-            process_node_smallpars_2(t.seed_node)
-
-            eventindex = [ n.matrow for n in t.nodes() if n.event > 0 ]
-            eventtypes = [ n.eventype for n in t.nodes() if n.event > 0 ]
+                l.char[pos] = min(l.scores[pos], key=l.scores[pos].get)
             if verbose == True:
                 with iolock:
-                    print(eventindex)
-                    print(eventtypes)
-    return (eventindex,eventtypes)
+                    print('done init')
+                    print(missing)
+                    print('missing in aln')
+                    for n in t.leaf_nodes()[0:5]:
+                        print(n)
+                        print(n.symbols)
+                        print(n.scores)
+                        print(n.char)
+                        print(n.event)
+    #up
+    process_node_smallpars_1(t.seed_node)
+    #down
+    process_node_smallpars_2(t.seed_node)
+    eventdict = {}
+    for pos in [0,1,2]:
+        eventindex = [ n.matrow for n in t.nodes() if n.event > 0 ]
+        eventtypes = [ n.eventype for n in t.nodes() if n.event > 0 ]
+        eventdict[pos] = { 'type': eventtypes , 'index' : eventindex }
+    AAeventindex = [ n.matrow for n in t.nodes() if n.AAevent > 0 ]
+    if verbose == True:
+        with iolock:
+            print(eventindex)
+            print(eventtypes)
+    return (eventdict , AAeventindex, column )
 
 def process( q , retq, iolock , tree , IDindex ):
     #calculate tree events
@@ -330,6 +331,9 @@ def mat_creator(retq,matsize,iolock, runName, datasize , verbose = False , resta
                         coevout.write(pickle.dumps((count,M1)))
                 print('done')
 
+
+
+
 def main(runName , align_array , replicates = None, bootstrap = None , restart = None ):
     #reset tree
     for i,n in enumerate(tree.nodes()):
@@ -339,6 +343,15 @@ def main(runName , align_array , replicates = None, bootstrap = None , restart =
         n.event = None
         n.char = None
         n.eventype = None
+        n.AAevent = None
+
+    for i,l in enumerate(tree.leaf_nodes()):
+        l.event = {}
+        l.scores = {}
+        l.symbols = {}
+        l.char= {}
+        l.calc = {}
+
     #our results will be events on tree nodes for each column
     matsize = (len(tree.nodes()),align_array.shape[1])
     q = mp.Queue(maxsize=NCORE*1000)
@@ -361,20 +374,38 @@ def main(runName , align_array , replicates = None, bootstrap = None , restart =
         for n in range(replicates):
             #select portion of random genomes to take out
             del_genomes = np.random.randint( align_array.shape[0], size= int(align_array.shape[0]*bootstrap) )
-            for i,k in enumerate(informativesites):
-
-                s1 = align_array[:,k]
-                #change characters of random genomes to N
-                s1[del_genomes, :] = b'N'
-                q.put( (k,s1) )
+            for i,r in annotation.iterrows():
+                #indexing starts at 1 for blast
+                for j,codon in enumerate(range(r.qstart-1, r.qend-1 , 3 )):
+                    positions = []
+                    for nt in [codon,codon+ 1, codon+2]:
+                        if nt in informativesites:
+                            s1 = align_array[:,nt]
+                            #change characters of random genomes to N
+                            s1[del_genomes] = b'N'
+                            positions.append(s1)
+                        else:
+                            #just add the alignment character if it doesnt change.
+                            positions.append(   align_array[0,nt] )
+                    q.put( (j,positions ) )
 
     else:
         datasize = len( informativesites )
         p = mp.Process(target=mat_creator, args=(retq,matsize, iolock, outname, datasize ))
         p.start()
-        for i,k in enumerate(informativesites):
-            s1 = align_array[:,k]
-            q.put( (k,s1) )
+        for i,r in annotation.iterrows():
+            positions = []
+            #indexing starts at 1 for blast
+            for j,codon in enumerate(range(r.qstart-1, r.qend-1 , 3 )):
+                for nt in [codon,codon+ 1, codon+2]:
+                    if nt in informativesites:
+                        s1 = align_array[:,nt]
+                        positions.append(s1)
+                    else:
+                        #just add the alignment character if it doesnt change.
+                        postions.append(align_array[0,nt] )
+                q.put( (k,positions) )
+
     for _ in range(2*NCORE):  # tell workers we're done
         q.put(None)
     pool.close()

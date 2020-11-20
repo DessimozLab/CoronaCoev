@@ -20,12 +20,17 @@ import itertools
 
 sys.setrecursionlimit( 10 **5 )
 runName = 'COEV_cleantree_mk6'
-NCORE = 60
+
+
 treefile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
 alnfile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
 
+#n cpu scores
+NCORE = 60
+
 #fraction of genomes to remove if jackknifing
 bootstrap = .33
+
 #number of replicates
 bootstrap_replicates = 20
 
@@ -80,9 +85,6 @@ IDindex = dict(zip( IDs.values() , IDs.keys() ) )
 
 print( [(t,IDindex[t]) for t in list(IDindex.keys())[0:10]] )
 
-
-
-
 for i,n in enumerate(tree.nodes()):
     n.matrow = i
     n.symbols = None
@@ -95,13 +97,11 @@ matsize = len(tree.nodes())
 print(matsize)
 print('nodes')
 
-
-
 def process_node_smallpars_1(node):
     #go from leaves up and generate character sets
     if node.symbols is None:
         for child in node.child_nodes():
-            if child.symbols is None:
+            if child.symbols is None:coevout.write(pickle.dumps((count,transiton_sparsemats[transition])))
                 process_node_smallpars_1(child)
         symbols = set.intersection( * [ child.symbols for child in node.child_nodes( ) ] )
         if len(symbols) == 0:
@@ -255,7 +255,7 @@ def mat_creator(retq,matsize,iolock, runName, datasize , verbose = False , resta
                 if transition_matrices == True:
                     for transition in transiton_sparsemats:
                         print( 'saving ' , transition)
-                        with open( runName + str(transition)+ '_coevmat_transitionmatrices.pkl' , 'wb') as coevout:
+                        with open( runName + str(transition)+ '_coevmat_coevout.write(pickle.dumps((count,transiton_sparsemats[transition])))transitionmatrices.pkl' , 'wb') as coevout:
                             transiton_sparsemats[transition].sum_duplicates()
                             coevout.write(pickle.dumps((count,transiton_sparsemats[transition])))
                 else:
