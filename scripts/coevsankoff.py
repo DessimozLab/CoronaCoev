@@ -9,7 +9,9 @@ import dill as pickle
 import time
 import h5py
 import dendropy
-from Bio import AlignIO , SeqIO
+from Bio import AlignIO , SeqIO , Seq
+from Bio.Alphabet import generic_dna
+
 from scipy import sparse
 import pickle
 import multiprocessing as mp
@@ -20,11 +22,11 @@ import os
 
 import itertools
 
-print('mk8codon')
+print('mk8_codon')
 
 sys.setrecursionlimit( 10 **5 )
 runName = 'COEV_cleantree_mk6'
-NCORE = 10
+NCORE = 50
 treefile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
 alnfile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
 
@@ -40,10 +42,13 @@ restart = None
 #keep track of transitions and not just events as binary
 
 transition_matrices = True
-allowed_symbols = { b'A', b'C', b'G' , b'T' }
+allowed_symbols = [ b'A', b'C', b'G' , b'T' ]
 allowed_transitions = [ c1+c2 for c1 in allowed_symbols for c2 in allowed_symbols  if c1!= c2]
 print(allowed_transitions)
+
 transition_dict = {  c : i  for i,c in enumerate( allowed_transitions )  }
+rev_transition_dict= dict( zip(transition_dict.values(), transition_dict.keys()))
+allowed_symbols = set(allowed_symbols)
 print( transition_dict)
 
 tree = dendropy.Tree.get(
@@ -70,6 +75,8 @@ else:
 print('selecting informative sites')
 #find all sites with mutations
 sites = {}
+
+#todo... paralellize this
 for col in range(align_array.shape[1]):
     if col % 1000  == 0:
         print(col)
@@ -77,6 +84,7 @@ for col in range(align_array.shape[1]):
     sites.update({col:dict(zip(list(unique), list(counts)))})
 informativesites = set([ s for s in sites if len( set( sites[s].keys()) -set([b'-',b'N']) ) > 1  ] )
 print(len(informativesites))
+
 print('done')
 #associate informative sites to a codon
 codon_dict = {}
@@ -105,13 +113,7 @@ IDs = {i:clipID(rec.id) for i,rec in enumerate(msa)}
 #IDs = {i:rec.id for i,rec in enumerate(msa)}
 IDindex = dict(zip( IDs.values() , IDs.keys() ) )
 print( [(t,IDindex[t]) for t in list(IDindex.keys())[0:10]] )
-for i,n in enumerate(tree.nodes()):
-    n.matrow = i
-    n.symbols = None
-    n.scores = None
-    n.event = None
-    n.char = None
-    n.eventype = None
+
 
 matsize = len(tree.nodes())
 print('done')
@@ -125,10 +127,14 @@ def process_node_smallpars_1(node):
         for child in node.child_nodes():
             if child.symbols is None:
                 process_node_smallpars_1(child)
+        node.symbols = { }
+        node.scores = { }
+
         for pos in [0,1,2]:
             symbols = set.intersection( * [ child.symbols[pos] for child in node.child_nodes( ) ] )
             if len(symbols) == 0:
                 symbols = set.union( * [ child.symbols[pos] for child in node.child_nodes( ) ] )
+
             node.symbols[pos] = symbols
             node.scores[pos] = { }
             for c in allowed_symbols:
@@ -142,27 +148,41 @@ def process_node_smallpars_1(node):
 def process_node_smallpars_2(node):
     #assign the most parsimonious char from children
     if node.char is None:
-        ancestral_AA = seq(''.join([ node.parent_node.char[pos] for pos in [0,1,2] ]).translate() )
-        for pos in [0,1,2]:
-            node.char[pos] = min(node.scores[pos], key=node.scores[pos].get)
-
-            if node.parent_node[pos]:
+        if node.parent_node:
+            #node has parent
+            node.char = {}
+            node.event = {}
+            node.eventype= {}
+            node.AAevent = 0
+            for pos in [0,1,2]:
+                node.char[pos] = min(node.scores[pos], key=node.scores[pos].get)
                 if node.parent_node.char[pos] == node.char[pos]:
                     node.event[pos] = 0
                 else:
-                    if node.scores[pos][node.parent_node.char] == node.scores[pos][node.char] :
+                    if node.scores[pos][node.parent_node.char[pos]] == node.scores[pos][node.char[pos]] :
                         node.char[pos] = node.parent_node.char[pos]
                         node.event[pos] = 0
                     else:
                         node.event[pos] = 1
-                        node.eventype[pos] = transition_dict[node.parent_node.char+node.char]
+                        node.eventype[pos] = transition_dict[node.parent_node.char[pos]+node.char[pos]]
 
-            else:
+            node.AA = Seq.Seq(b''.join([ node.char[pos] for pos in [0,1,2] ]).decode(), generic_dna ).translate()
+            if node.AA != node.parent_node.AA:
+                node.AAevent = 1
+
+        else:
+            #root node
+            node.char = {}
+            node.event= {}
+            node.eventype = {}
+            node.AAevent = 0
+            for pos in [0,1,2]:
+
+                node.char[pos] = min(node.scores[pos], key=node.scores[pos].get)
                 node.event[pos] = 0
-        AA = seq(''.join([ node.char[pos] for pos in [0,1,2] ]).translate())
-        if AA != ancestral_AA:
-            node.AAevent = 1
-        #down on level
+
+            node.AA = Seq.Seq(b''.join([ node.char[pos] for pos in [0,1,2] ]).decode(), generic_dna ).translate()
+        #down one level
         for child in node.child_nodes():
             if child.char is None:
                 process_node_smallpars_2(child)
@@ -173,7 +193,6 @@ def calculate_small_parsimony( t, aln_columns , row_index , iolock, verbose  = T
     #assign leaf values
     print(aln_columns)
     for pos,col in enumerate(aln_columns):
-
         for l in t.leaf_nodes():
             if hasattr(col , 'decode'):
                 #column has no events
@@ -188,12 +207,14 @@ def calculate_small_parsimony( t, aln_columns , row_index , iolock, verbose  = T
                     #ambiguous leaf
                     l.symbols[pos] = allowed_symbols
             else:
+
                 #setup for small_pars1
                 l.calc[pos] = True
                 l.event[pos] =0
                 l.scores[pos] = { c:10**10 for c in allowed_symbols }
 
                 if str(l.taxon).replace("'", '') in row_index:
+
                     char = col[ row_index[str(l.taxon).replace("'", '')]  ]
                     if char.upper() in allowed_symbols:
                         l.symbols[pos] = { char }
@@ -210,32 +231,24 @@ def calculate_small_parsimony( t, aln_columns , row_index , iolock, verbose  = T
                         with iolock:
                             print( 'err ! alncol: ', l.taxon , aln_column  )
                 l.char[pos] = min(l.scores[pos], key=l.scores[pos].get)
-            if verbose == True:
-                with iolock:
-                    print('done init')
-                    print(missing)
-                    print('missing in aln')
-                    for n in t.leaf_nodes()[0:5]:
-                        print(n)
-                        print(n.symbols)
-                        print(n.scores)
-                        print(n.char)
-                        print(n.event)
+
     #up
     process_node_smallpars_1(t.seed_node)
     #down
     process_node_smallpars_2(t.seed_node)
     eventdict = {}
     for pos in [0,1,2]:
-        eventindex = [ n.matrow for n in t.nodes() if n.event > 0 ]
-        eventtypes = [ n.eventype for n in t.nodes() if n.event > 0 ]
+        eventindex = [ n.matrow for n in t.nodes() if n.event[pos] > 0 ]
+        eventtypes = [ n.eventype[pos] for n in t.nodes() if n.event[pos] > 0 ]
         eventdict[pos] = { 'type': eventtypes , 'index' : eventindex }
     AAeventindex = [ n.matrow for n in t.nodes() if n.AAevent > 0 ]
+
     if verbose == True:
         with iolock:
-            print(eventindex)
-            print(eventtypes)
-    return (eventdict , AAeventindex, column )
+            print('smallpars done')
+            print(eventdict)
+            print(AAeventindex)
+    return (eventdict , AAeventindex)
 
 def process( q , retq, iolock , tree , IDindex ):
     #calculate tree events
@@ -272,6 +285,8 @@ def mat_creator(retq,matsize,iolock, runName, datasize , verbose = False , resta
                 count , M1 = pickle.loads(pklin.read())
     else:
         count = 0
+        AAmutation = sparse.csc_matrix((matsize[0],matsize[1]) , dtype=np.int32 )
+
         if transition_matrices == True:
             transiton_sparsemats = {}
             for c in transition_dict:
@@ -283,23 +298,33 @@ def mat_creator(retq,matsize,iolock, runName, datasize , verbose = False , resta
     while True:
         r = retq.get()
         count+=1
-        col,events = r
-        eventindex,eventtypes = events
-        if len(eventindex)>0:
-            if verbose == True:
-                print( eventindex , eventtypes)
-            if transition_matrices == True:
-                transition_types = np.unique(eventtypes)
+        column,events = r
+        eventdict ,AAeventindex  = events
+        if verbose == True:
+            print( eventdict , AAeventindex )
+
+        #save each position to event mats
+        for pos in [0,1,2]:
+
+            col = column+pos
+
+
+            eventindex = eventdict[pos]['index']
+            eventtypes = eventdict[pos]['type']
+
+            if len(eventindex)>0:
                 if verbose == True:
-                    print(transition_types)
-                for e in list(transition_types):
-                    typeindex = np.where( eventtypes == e )[0]
-                    print(typeindex)
-                    selectrows = np.array(eventindex)[typeindex]
-                    transiton_sparsemats[e]  += sparse.csc_matrix( ( np.ones(len(selectrows))  , (selectrows , np.ones(len(selectrows )) * col ) ) , shape= (matsize[0] , matsize[1] ) ,  dtype = np.int32 )
-            else:
-                M1 += sparse.csc_matrix( ( np.ones(len(eventindex))  , (eventindex , np.ones(len(eventindex)) * col ) ) , shape= (matsize[0] , matsize[1] ) ,  dtype = np.int32 )
-        if count == datasize:
+                    print( eventindex , eventtypes)
+                if transition_matrices == True:
+                    transition_types = np.unique(eventtypes)
+                    for e in list(transition_types):
+                        typeindex = np.where( eventtypes == e )[0]
+                        selectrows = np.array(eventindex)[typeindex]
+                        transiton_sparsemats[rev_transition_dict[e]]  += sparse.csc_matrix( ( np.ones(len(selectrows))  , (selectrows , np.ones(len(selectrows )) * col ) ) , shape= (matsize[0] , matsize[1] ) ,  dtype = np.int32 )
+                else:
+                    M1 += sparse.csc_matrix( ( np.ones(len(eventindex))  , (eventindex , np.ones(len(eventindex)) * col ) ) , shape= (matsize[0] , matsize[1] ) ,  dtype = np.int32 )
+        AAmutation  += sparse.csc_matrix( ( np.ones(len(AAeventindex))  , (AAeventindex , np.ones(len(AAeventindex)) * column ) ) , shape= (matsize[0] , matsize[1] ) ,  dtype = np.int32 )
+        if count >= datasize:
             with iolock:
                 print('final save')
                 print( time.time()- runtime )
@@ -309,6 +334,9 @@ def mat_creator(retq,matsize,iolock, runName, datasize , verbose = False , resta
                         with open( runName + str(transition)+ '_coevmat_transitionmatrices.pkl' , 'wb') as coevout:
                             transiton_sparsemats[transition].sum_duplicates()
                             coevout.write(pickle.dumps((count,transiton_sparsemats[transition])))
+                    with open( runName + '_coevmat_AAmutations.pkl' , 'wb') as coevout:
+                        AAmutation.sum_duplicates()
+                        coevout.write(pickle.dumps((count,AAmutation)))
                 else:
                     with open( runName + 'coevmat.pkl' , 'wb') as coevout:
                         coevout.write(pickle.dumps((count,M1)))
@@ -343,7 +371,7 @@ def main(runName , align_array , replicates = None, bootstrap = None , restart =
         n.event = None
         n.char = None
         n.eventype = None
-        n.AAevent = None
+        n.AAevent = 0
 
     for i,l in enumerate(tree.leaf_nodes()):
         l.event = {}
@@ -404,7 +432,7 @@ def main(runName , align_array , replicates = None, bootstrap = None , restart =
                     else:
                         #just add the alignment character if it doesnt change.
                         postions.append(align_array[0,nt] )
-                q.put( (k,positions) )
+                q.put( (j,positions) )
 
     for _ in range(2*NCORE):  # tell workers we're done
         q.put(None)
