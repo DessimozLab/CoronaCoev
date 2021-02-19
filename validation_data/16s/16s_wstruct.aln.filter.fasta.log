@@ -1,0 +1,1306 @@
+IQ-TREE multicore version 1.6.1 for Linux 64-bit built Feb 16 2018
+Developed by Bui Quang Minh, Nguyen Lam Tung, Olga Chernomor,
+Heiko Schmidt, Dominik Schrempf, Michael Woodhams.
+
+Host:    megazord (AVX2, FMA3, 62 GB RAM)
+Command: iqtree -s 16s_wstruct.aln.filter.fasta -m HKY+P
+Seed:    290714 (Using SPRNG - Scalable Parallel Random Number Generator)
+Time:    Thu Feb 18 14:32:43 2021
+Kernel:  AVX+FMA - 1 threads (8 CPU cores detected)
+
+HINT: Use -nt option to specify number of threads because your CPU has 8 cores!
+HINT: -nt AUTO will automatically determine the best number of threads to use.
+
+Reading alignment file 16s_wstruct.aln.filter.fasta ... Fasta format detected
+Alignment most likely contains DNA/RNA sequences
+WARNING: 23 sites contain only gaps or ambiguous characters.
+Alignment has 141 sequences with 2905 columns, 2274 distinct patterns
+1688 parsimony-informative, 452 singleton sites, 765 constant sites
+WARNING: Some sequence names are changed as follows:
+4V9D_1|Chains/1-1539 -> 4V9D_1_Chains_1-1539
+cy.ic.aer/11555/1-1508 -> cy.ic.aer_11555_1-1508
+cy.Osc.aga/11485/1-1463 -> cy.Osc.aga_11485_1-1463
+cy.Pho.ab/11477/1-1439 -> cy.Pho.ab_11477_1-1439
+cy.Tri.ten/11478/1-1437 -> cy.Tri.ten_11478_1-1437
+pl.Zea.ay/11809/1-1809 -> pl.Zea.ay_11809_1-1809
+pl.Pan.gin/11811/1-1811 -> pl.Pan.gin_11811_1-1811
+pl.Ara.tha/11804/1-1804 -> pl.Ara.tha_11804_1-1804
+pl.Gly.ax/11807/1-1807 -> pl.Gly.ax_11807_1-1807
+pl.Pis.sat/11808/1-1808 -> pl.Pis.sat_11808_1-1808
+pl.Lyc.esc/11800/1-1800 -> pl.Lyc.esc_11800_1-1800
+pl.Sol.tub/11807/1-1807 -> pl.Sol.tub_11807_1-1807
+pl.Gin.bil/11811/1-1811 -> pl.Gin.bil_11811_1-1811
+pl.Pin.luc/11810/1-1810 -> pl.Pin.luc_11810_1-1810
+pl.Tai.cry/11811/1-1811 -> pl.Tai.cry_11811_1-1811
+pr.Sar.neu/11806/1-1806 -> pr.Sar.neu_11806_1-1806
+pr.Pla.al/12147/1-2147 -> pr.Pla.al_12147_1-2147
+pr.Sti.hel/11795/1-1795 -> pr.Sti.hel_11795_1-1795
+pr.al.at/11811/1-1811 -> pr.al.at_11811_1-1811
+pr.Cyc.gla/11763/1-1763 -> pr.Cyc.gla_11763_1-1763
+pr.Tet.bor/11752/1-1752 -> pr.Tet.bor_11752_1-1752
+pr.Rho.sal/11762/1-1762 -> pr.Rho.sal_11762_1-1762
+pr.Por.aca/11844/1-1844 -> pr.Por.aca_11844_1-1844
+pr.Bla.ho/11770/1-1770 -> pr.Bla.ho_11770_1-1770
+an.Dro.el/11995/1-1995 -> an.Dro.el_11995_1-1995
+an.La.aep/11824/1-1824 -> an.La.aep_11824_1-1824
+an.Xen.lae/11825/1-1825 -> an.Xen.lae_11825_1-1825
+an.Ho.sap/11869/1-1869 -> an.Ho.sap_11869_1-1869
+an.us.us/11869/1-1869 -> an.us.us_11869_1-1869
+an.Rat.nor/11870/1-1870 -> an.Rat.nor_11870_1-1870
+an.Ast.au/11803/1-1803 -> an.Ast.au_11803_1-1803
+an.Str.int/11814/1-1814 -> an.Str.int_11814_1-1814
+an.Cae.ele/11760/1-1760 -> an.Cae.ele_11760_1-1760
+an.Bra.pli/11810/1-1810 -> an.Bra.pli_11810_1-1810
+fu.Sch.po/11842/1-1842 -> fu.Sch.po_11842_1-1842
+fu.Asp.nid/11798/1-1798 -> fu.Asp.nid_11798_1-1798
+fu.Asp.ta/11799/1-1799 -> fu.Asp.ta_11799_1-1799
+fu.Neu.cra/11795/1-1795 -> fu.Neu.cra_11795_1-1795
+fu.Can.gla/11798/1-1798 -> fu.Can.gla_11798_1-1798
+fu.Sac.cer/11798/1-1798 -> fu.Sac.cer_11798_1-1798
+fu.Bul.hui/11801/1-1801 -> fu.Bul.hui_11801_1-1801
+fu.Den.sul/11799/1-1799 -> fu.Den.sul_11799_1-1799
+fu.Fel.oga/11794/1-1794 -> fu.Fel.oga_11794_1-1794
+fu.Gig.ar/11803/1-1803 -> fu.Gig.ar_11803_1-1803
+fl.Bac.spl/11520/1-1520 -> fl.Bac.spl_11520_1-1520
+fl.Cyt.ar/11526/1-1526 -> fl.Cyt.ar_11526_1-1526
+fl.Fla.xan/11504/1-1504 -> fl.Fla.xan_11504_1-1504
+fl.ar.psy/11508/1-1508 -> fl.ar.psy_11508_1-1508
+fl.Pre.eno/11521/1-1521 -> fl.Pre.eno_11521_1-1521
+fu.Fus.gon/11505/1-1457 -> fu.Fus.gon_11505_1-1457
+fu.Fus.nul/11507/1-1331 -> fu.Fus.nul_11507_1-1331
+fu.Lep.buc/11503/1-1468 -> fu.Lep.buc_11503_1-1468
+fu.Lep.ic/11506/1-1462 -> fu.Lep.ic_11506_1-1462
+gr.The.ros/11528/1-1528 -> gr.The.ros_11528_1-1528
+pt.Iso.pal/11511/1-1460 -> pt.Iso.pal_11511_1-1460
+pt.Pla.bra/11507/1-1150 -> pt.Pla.bra_11507_1-1150
+pt.Pla.ar/11527/1-1156 -> pt.Pla.ar_11527_1-1156
+ch.Zea.ay/11491/1-1491 -> ch.Zea.ay_11491_1-1491
+ch.Dau.car/11486/1-1484 -> ch.Dau.car_11486_1-1484
+ch.Gly.ax/11471/1-1470 -> ch.Gly.ax_11471_1-1470
+ch.Pis.sat/11487/1-1487 -> ch.Pis.sat_11487_1-1487
+ch.Nic.tab/11486/1-1486 -> ch.Nic.tab_11486_1-1486
+ch.Pin.thu/11491/1-1491 -> ch.Pin.thu_11491_1-1491
+ch.Chl.ir/11629/1-1629 -> ch.Chl.ir_11629_1-1629
+ch.Eug.gra/11498/1-1496 -> ch.Eug.gra_11498_1-1496
+ch.Cya.par/11495/1-1495 -> ch.Cya.par_11495_1-1495
+ch.Cya.cal/11492/1-1492 -> ch.Cya.cal_11492_1-1492
+ga.Esc.col/11542/1-1542 -> ga.Esc.col_11542_1-1542
+ga.Hae.par/11535/1-1483 -> ga.Hae.par_11535_1-1483
+ga.Leg.lyt/11531/1-1432 -> ga.Leg.lyt_11531_1-1432
+ga.ar.psy/11537/1-1502 -> ga.ar.psy_11537_1-1502
+ga.Oce.pus/11495/1-1447 -> ga.Oce.pus_11495_1-1447
+ga.Pho.pho/11533/1-1465 -> ga.Pho.pho_11533_1-1465
+ga.Pse.asp/11526/1-1491 -> ga.Pse.asp_11526_1-1491
+ga.Sal.typ/11536/1-1534 -> ga.Sal.typ_11536_1-1534
+ga.Vib.cho/11540/1-1538 -> ga.Vib.cho_11540_1-1538
+ga.Xan.pis/11537/1-1502 -> ga.Xan.pis_11537_1-1502
+ra.Dei.ur/11498/1-1472 -> ra.Dei.ur_11498_1-1472
+ra.Dei.rad/11502/1-1502 -> ra.Dei.rad_11502_1-1502
+sp.Bor.par/11526/1-1522 -> sp.Bor.par_11526_1-1522
+sp.Lep.ey/11497/1-1418 -> sp.Lep.ey_11497_1-1418
+sp.Tre.soc/11527/1-1404 -> sp.Tre.soc_11527_1-1404
+sp.Tre.suc/11569/1-1510 -> sp.Tre.suc_11569_1-1510
+th.The.afr/11563/1-1403 -> th.The.afr_11563_1-1403
+th.The.hyp/11538/1-1521 -> th.The.hyp_11538_1-1521
+th.The.sub/11545/1-1481 -> th.The.sub_11545_1-1481
+ar.Sul.sol/11494/1-1493 -> ar.Sul.sol_11494_1-1493
+ar.The.pen/11511/1-1509 -> ar.The.pen_11511_1-1509
+ar.Hal.val/11471/1-1471 -> ar.Hal.val_11471_1-1471
+ar.Hal.sac/11469/1-1469 -> ar.Hal.sac_11469_1-1469
+ar.Nat.ag/11466/1-1466 -> ar.Nat.ag_11466_1-1466
+ar.et.fer/11486/1-1481 -> ar.et.fer_11486_1-1481
+ar.et.jan/11476/1-1475 -> ar.et.jan_11476_1-1475
+ar.et.ore/11475/1-1421 -> ar.et.ore_11475_1-1421
+ar.The.chi/11494/1-1427 -> ar.The.chi_11494_1-1427
+ar.The.ste/11497/1-1463 -> ar.The.ste_11497_1-1463
+hi.Act.eur/11531/1-1410 -> hi.Act.eur_11531_1-1410
+hi.Bif.inf/11523/1-1474 -> hi.Bif.inf_11523_1-1474
+hi.Cel.cel/11513/1-1453 -> hi.Cel.cel_11513_1-1453
+hi.Cor.oti/11538/1-1461 -> hi.Cor.oti_11538_1-1461
+hi.ic.par/11511/1-1414 -> hi.ic.par_11511_1-1414
+hi.ic.ech/11505/1-1465 -> hi.ic.ech_11505_1-1465
+hi.yc.cel/11519/1-1460 -> hi.yc.cel_11519_1-1460
+hi.yc.int/11510/1-1441 -> hi.yc.int_11510_1-1441
+hi.Noc.fla/11505/1-1470 -> hi.Noc.fla_11505_1-1470
+hi.Str.ri/11529/1-1529 -> hi.Str.ri_11529_1-1529
+lo.Ach.lai/11501/1-1480 -> lo.Ach.lai_11501_1-1480
+lo.Bac.alc/11537/1-1424 -> lo.Bac.alc_11537_1-1424
+lo.Bac.sub/11550/1-1550 -> lo.Bac.sub_11550_1-1550
+lo.Car.ob/11544/1-1385 -> lo.Car.ob_11544_1-1385
+lo.Eub.lac/11522/1-1401 -> lo.Eub.lac_11522_1-1401
+lo.Lac.car/11551/1-1503 -> lo.Lac.car_11551_1-1503
+lo.yc.cap/11521/1-1521 -> lo.yc.cap_11521_1-1521
+lo.yc.yc/11513/1-1466 -> lo.yc.yc_11513_1-1466
+lo.Spi.cit/11530/1-1530 -> lo.Spi.cit_11530_1-1530
+lo.Sta.ho/11546/1-1544 -> lo.Sta.ho_11546_1-1544
+t.Sac.cer/11669/1-1669 -> t.Sac.cer_11669_1-1669
+t.Gly.ax/11990/1-1990 -> t.Gly.ax_11990_1-1990
+t.Zea.ay/11968/1-1968 -> t.Zea.ay_11968_1-1968
+t.Tet.pyr/11660/1-1660 -> t.Tet.pyr_11660_1-1660
+al.Aci.cry/11481/1-1413 -> al.Aci.cry_11481_1-1413
+al.et.rho/11475/1-1407 -> al.et.rho_11475_1-1407
+al.Rhi.fre/11481/1-1481 -> al.Rhi.fre_11481_1-1481
+al.Ric.pea/11489/1-1157 -> al.Ric.pea_11489_1-1157
+al.Sph.ter/11472/1-1417 -> al.Sph.ter_11472_1-1417
+be.Hyd.pal/11519/1-1480 -> be.Hyd.pal_11519_1-1480
+be.Nei.fla/11534/1-1486 -> be.Nei.fla_11534_1-1486
+be.Pse.syz/11521/1-1445 -> be.Pse.syz_11521_1-1445
+be.Rho.pur/11534/1-1478 -> be.Rho.pur_11534_1-1478
+be.Tha.ter/11528/1-1484 -> be.Tha.ter_11528_1-1484
+de.Des.vib/11550/1-1516 -> de.Des.vib_11550_1-1516
+de.Des.ter/11537/1-1506 -> de.Des.ter_11537_1-1506
+de.Des.suc/11521/1-1435 -> de.Des.suc_11521_1-1435
+ep.Alv.po/11504/1-1502 -> ep.Alv.po_11504_1-1502
+ep.Ca.fet/11509/1-1461 -> ep.Ca.fet_11509_1-1461
+ep.Ca.lar/11507/1-1459 -> ep.Ca.lar_11507_1-1459
+ep.Hel.pyl/11498/1-1450 -> ep.Hel.pyl_11498_1-1450
+ep.Hel.tro/11486/1-1422 -> ep.Hel.tro_11486_1-1422
+un.Aer.ar/11550/1-1488 -> un.Aer.ar_11550_1-1488
+un.Fle.sin/11548/1-1500 -> un.Fle.sin_11548_1-1500
+un.ag.bav/11515/1-1513 -> un.ag.bav_11515_1-1513
+
+                         Gap/Ambiguity  Composition  p-value
+   1  4V9D_1_Chains_1-1539      47.02%    passed     27.85%
+   2  cy.ic.aer_11555_1-1508    48.09%    passed      7.48%
+   3  cy.Osc.aga_11485_1-1463   49.64%    failed      1.16%
+   4  cy.Pho.ab_11477_1-1439    50.46%    passed     15.93%
+   5  cy.Tri.ten_11478_1-1437   50.53%    passed      5.69%
+   6  pl.Zea.ay_11809_1-1809    37.73%    passed      7.58%
+   7  pl.Pan.gin_11811_1-1811   37.73%    failed      0.22%
+   8  pl.Ara.tha_11804_1-1804   37.90%    failed      0.22%
+   9  pl.Gly.ax_11807_1-1807    37.80%    failed      0.08%
+  10  pl.Pis.sat_11808_1-1808   40.69%    failed      0.29%
+  11  pl.Lyc.esc_11800_1-1800   38.04%    failed      0.39%
+  12  pl.Sol.tub_11807_1-1807   37.80%    failed      0.43%
+  13  pl.Gin.bil_11811_1-1811   40.38%    failed      3.61%
+  14  pl.Pin.luc_11810_1-1810   40.41%    failed      0.94%
+  15  pl.Tai.cry_11811_1-1811   40.38%    failed      2.40%
+  16  pr.Sar.neu_11806_1-1806   37.93%    failed      0.00%
+  17  pr.Pla.al_12147_1-2147    26.09%    failed      0.00%
+  18  pr.Sti.hel_11795_1-1795   40.34%    failed      0.04%
+  19  pr.al.at_11811_1-1811     37.66%    failed      0.00%
+  20  pr.Cyc.gla_11763_1-1763   41.07%    failed      0.00%
+  21  pr.Tet.bor_11752_1-1752   39.69%    failed      0.00%
+  22  pr.Rho.sal_11762_1-1762   39.35%    failed      0.00%
+  23  pr.Por.aca_11844_1-1844   38.18%    failed      0.01%
+  24  pr.Bla.ho_11770_1-1770    40.76%    failed      0.00%
+  25  an.Dro.el_11995_1-1995    31.33%    failed      0.00%
+  26  an.La.aep_11824_1-1824    38.59%    passed     11.34%
+  27  an.Xen.lae_11825_1-1825   37.18%    failed      1.07%
+  28  an.Ho.sap_11869_1-1869    35.66%    failed      0.01%
+  29  an.us.us_11869_1-1869     35.66%    failed      0.01%
+  30  an.Rat.nor_11870_1-1870   35.63%    failed      0.01%
+  31  an.Ast.au_11803_1-1803    42.75%    passed     10.55%
+  32  an.Str.int_11814_1-1814   42.55%    passed     20.08%
+  33  an.Cae.ele_11760_1-1760   39.41%    failed      0.00%
+  34  an.Bra.pli_11810_1-1810   40.24%    failed      0.00%
+  35  fu.Sch.po_11842_1-1842    36.59%    failed      0.00%
+  36  fu.Asp.nid_11798_1-1798   42.48%    failed      3.63%
+  37  fu.Asp.ta_11799_1-1799    40.34%    failed      0.93%
+  38  fu.Neu.cra_11795_1-1795   38.21%    failed      0.05%
+  39  fu.Can.gla_11798_1-1798   38.11%    failed      0.00%
+  40  fu.Sac.cer_11798_1-1798   38.11%    failed      0.00%
+  41  fu.Bul.hui_11801_1-1801   40.31%    failed      0.00%
+  42  fu.Den.sul_11799_1-1799   39.55%    failed      0.00%
+  43  fu.Fel.oga_11794_1-1794   39.79%    failed      0.00%
+  44  fu.Gig.ar_11803_1-1803    39.83%    failed      0.00%
+  45  fl.Bac.spl_11520_1-1520   49.81%    passed     66.71%
+  46  fl.Cyt.ar_11526_1-1526    49.64%    passed     37.70%
+  47  fl.Fla.xan_11504_1-1504   50.09%    passed     10.69%
+  48  fl.ar.psy_11508_1-1508    51.05%    passed     35.79%
+  49  fl.Pre.eno_11521_1-1521   50.26%    passed     71.42%
+  50  fu.Fus.gon_11505_1-1457   50.43%    passed     49.85%
+  51  fu.Fus.nul_11507_1-1331   54.70%    passed      6.57%
+  52  fu.Lep.buc_11503_1-1468   49.88%    passed     27.38%
+  53  fu.Lep.ic_11506_1-1462    49.95%    failed      0.00%
+  54  gr.The.ros_11528_1-1528   47.61%    failed      0.00%
+  55  pt.Iso.pal_11511_1-1460   50.67%    failed      0.00%
+  56  pt.Pla.bra_11507_1-1150   60.41%    passed     20.67%
+  57  pt.Pla.ar_11527_1-1156    60.24%    passed     31.34%
+  58  ch.Zea.ay_11491_1-1491    48.67%    failed      2.13%
+  59  ch.Dau.car_11486_1-1484   48.92%    failed      1.04%
+  60  ch.Gly.ax_11471_1-1470    49.40%    failed      3.43%
+  61  ch.Pis.sat_11487_1-1487   48.81%    passed     12.40%
+  62  ch.Nic.tab_11486_1-1486   48.85%    failed      0.72%
+  63  ch.Pin.thu_11491_1-1491   48.67%    failed      0.42%
+  64  ch.Chl.ir_11629_1-1629    44.13%    passed     51.47%
+  65  ch.Eug.gra_11498_1-1496   48.50%    failed      0.00%
+  66  ch.Cya.par_11495_1-1495   48.54%    passed     83.35%
+  67  ch.Cya.cal_11492_1-1492   48.64%    failed      1.05%
+  68  ga.Esc.col_11542_1-1542   46.92%    passed     30.09%
+  69  ga.Hae.par_11535_1-1483   49.88%    passed     56.80%
+  70  ga.Leg.lyt_11531_1-1432   50.71%    passed     11.38%
+  71  ga.ar.psy_11537_1-1502    48.33%    passed     53.14%
+  72  ga.Oce.pus_11495_1-1447   50.50%    passed     87.48%
+  73  ga.Pho.pho_11533_1-1465   49.64%    passed     57.91%
+  74  ga.Pse.asp_11526_1-1491   48.74%    passed     49.59%
+  75  ga.Sal.typ_11536_1-1534   47.19%    passed     23.34%
+  76  ga.Vib.cho_11540_1-1538   47.13%    passed     41.00%
+  77  ga.Xan.pis_11537_1-1502   48.33%    passed     13.09%
+  78  ra.Dei.ur_11498_1-1472    49.33%    failed      0.05%
+  79  ra.Dei.rad_11502_1-1502   48.30%    passed     10.59%
+  80  sp.Bor.par_11526_1-1522   47.61%    failed      0.04%
+  81  sp.Lep.ey_11497_1-1418    51.26%    passed     70.41%
+  82  sp.Tre.soc_11527_1-1404   51.67%    failed      0.00%
+  83  sp.Tre.suc_11569_1-1510   48.92%    failed      0.00%
+  84  th.The.afr_11563_1-1403   52.60%    failed      0.00%
+  85  th.The.hyp_11538_1-1521   47.75%    failed      0.00%
+  86  th.The.sub_11545_1-1481   49.02%    failed      0.00%
+  87  ar.Sul.sol_11494_1-1493   48.61%    failed      0.00%
+  88  ar.The.pen_11511_1-1509   48.06%    failed      0.00%
+  89  ar.Hal.val_11471_1-1471   49.36%    failed      0.60%
+  90  ar.Hal.sac_11469_1-1469   49.43%    failed      0.00%
+  91  ar.Nat.ag_11466_1-1466    49.54%    failed      0.11%
+  92  ar.et.fer_11486_1-1481    49.02%    failed      0.00%
+  93  ar.et.jan_11476_1-1475    49.23%    failed      0.00%
+  94  ar.et.ore_11475_1-1421    51.53%    passed      7.03%
+  95  ar.The.chi_11494_1-1427   51.15%    failed      0.00%
+  96  ar.The.ste_11497_1-1463   49.64%    failed      0.00%
+  97  hi.Act.eur_11531_1-1410   51.53%    failed      0.02%
+  98  hi.Bif.inf_11523_1-1474   51.29%    failed      0.00%
+  99  hi.Cel.cel_11513_1-1453   49.98%    failed      0.03%
+ 100  hi.Cor.oti_11538_1-1461   49.91%    failed      0.01%
+ 101  hi.ic.par_11511_1-1414    51.33%    failed      0.00%
+ 102  hi.ic.ech_11505_1-1465    49.57%    failed      0.00%
+ 103  hi.yc.cel_11519_1-1460    49.78%    failed      0.00%
+ 104  hi.yc.int_11510_1-1441    50.40%    failed      0.01%
+ 105  hi.Noc.fla_11505_1-1470   49.40%    failed      0.05%
+ 106  hi.Str.ri_11529_1-1529    47.37%    failed      0.00%
+ 107  lo.Ach.lai_11501_1-1480   49.05%    failed      0.52%
+ 108  lo.Bac.alc_11537_1-1424   51.15%    passed     54.85%
+ 109  lo.Bac.sub_11550_1-1550   46.64%    passed     24.06%
+ 110  lo.Car.ob_11544_1-1385    54.01%    passed     71.38%
+ 111  lo.Eub.lac_11522_1-1401   52.05%    passed      9.42%
+ 112  lo.Lac.car_11551_1-1503   49.19%    passed     85.33%
+ 113  lo.yc.cap_11521_1-1521    47.64%    failed      0.32%
+ 114  lo.yc.yc_11513_1-1466     49.54%    failed      0.65%
+ 115  lo.Spi.cit_11530_1-1530   47.33%    failed      3.44%
+ 116  lo.Sta.ho_11546_1-1544    46.92%    passed     63.08%
+ 117  t.Sac.cer_11669_1-1669    42.55%    failed      0.00%
+ 118  t.Gly.ax_11990_1-1990     31.50%    passed     83.22%
+ 119  t.Zea.ay_11968_1-1968     32.25%    passed     34.80%
+ 120  t.Tet.pyr_11660_1-1660    42.86%    failed      0.00%
+ 121  al.Aci.cry_11481_1-1413   51.36%    failed      0.51%
+ 122  al.et.rho_11475_1-1407    51.57%    failed      0.43%
+ 123  al.Rhi.fre_11481_1-1481   49.12%    passed      9.19%
+ 124  al.Ric.pea_11489_1-1157   60.17%    passed     55.28%
+ 125  al.Sph.ter_11472_1-1417   51.22%    passed     66.57%
+ 126  be.Hyd.pal_11519_1-1480   49.05%    failed      3.63%
+ 127  be.Nei.fla_11534_1-1486   49.33%    passed     74.46%
+ 128  be.Pse.syz_11521_1-1445   50.26%    passed     22.73%
+ 129  be.Rho.pur_11534_1-1478   49.36%    passed      7.93%
+ 130  be.Tha.ter_11528_1-1484   48.92%    passed      5.87%
+ 131  de.Des.vib_11550_1-1516   47.85%    passed     72.19%
+ 132  de.Des.ter_11537_1-1506   48.85%    failed      0.21%
+ 133  de.Des.suc_11521_1-1435   50.64%    passed     35.71%
+ 134  ep.Alv.po_11504_1-1502    48.36%    passed      6.59%
+ 135  ep.Ca.fet_11509_1-1461    50.19%    failed      4.11%
+ 136  ep.Ca.lar_11507_1-1459    49.98%    passed     33.61%
+ 137  ep.Hel.pyl_11498_1-1450   50.29%    passed     43.56%
+ 138  ep.Hel.tro_11486_1-1422   51.05%    passed     67.49%
+ 139  un.Aer.ar_11550_1-1488    48.81%    failed      0.00%
+ 140  un.Fle.sin_11548_1-1500   49.29%    passed     16.98%
+ 141  un.ag.bav_11515_1-1513    47.92%    passed     12.07%
+WARNING: 33 sequences contain more than 50% gaps/ambiguity
+****  TOTAL                     46.33%  84 sequences failed composition chi2 test (p-value<5%; df=3)
+
+Create initial parsimony tree by phylogenetic likelihood library (PLL)... 0.043 seconds
+ERROR: modelpomo.cpp:180: virtual void ModelPoMo::init(const char*, std::__cxx11::string, StateFreqType, std::__cxx11::string, std::__cxx11::string): Assertion `num_states == (n_alleles + (n_alleles*(n_alleles-1)/2 * (N-1)))' failed.
+ERROR: STACK TRACE FOR DEBUGGING:
+ERROR: 1   funcAbort()
+ERROR: 2   ()
+ERROR: 3   gsignal()
+ERROR: 4   abort()
+ERROR: 5   ()
+ERROR: 6   ModelPoMo::init(char const*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, StateFreqType, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >)
+ERROR: 7   ModelPoMo::ModelPoMo(char const*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, StateFreqType, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, PhyloTree*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >)
+ERROR: 8   createModel(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, ModelsBlock*, StateFreqType, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, PhyloTree*)
+ERROR: 9   ModelFactory::ModelFactory(Params&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, PhyloTree*, ModelsBlock*)
+ERROR: 10   IQTree::initializeModel(Params&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, ModelsBlock*)
+ERROR: 11   runTreeReconstruction(Params&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, IQTree*&, ModelCheckpoint&)
+ERROR: 12   runPhyloAnalysis(Params&, Checkpoint*)
+ERROR: 13   main()
+ERROR: 14   __libc_start_main()
+ERROR: 15   _start()
+ERROR: 
+ERROR: *** IQ-TREE CRASHES WITH SIGNAL ABORTED
+ERROR: *** For bug report please send to developers:
+ERROR: ***    Log file: 16s_wstruct.aln.filter.fasta.log
+ERROR: ***    Alignment files (if possible)
+
+******************************************************
+CHECKPOINT: Resuming analysis from 16s_wstruct.aln.filter.fasta.ckp.gz
+
+IQ-TREE multicore version 1.6.1 for Linux 64-bit built Feb 16 2018
+Developed by Bui Quang Minh, Nguyen Lam Tung, Olga Chernomor,
+Heiko Schmidt, Dominik Schrempf, Michael Woodhams.
+
+Host:    megazord (AVX2, FMA3, 62 GB RAM)
+Command: iqtree -s 16s_wstruct.aln.filter.fasta
+Seed:    75160 (Using SPRNG - Scalable Parallel Random Number Generator)
+Time:    Thu Feb 18 14:32:57 2021
+Kernel:  AVX+FMA - 1 threads (8 CPU cores detected)
+
+HINT: Use -nt option to specify number of threads because your CPU has 8 cores!
+HINT: -nt AUTO will automatically determine the best number of threads to use.
+
+Reading alignment file 16s_wstruct.aln.filter.fasta ... Fasta format detected
+Alignment most likely contains DNA/RNA sequences
+WARNING: 23 sites contain only gaps or ambiguous characters.
+Alignment has 141 sequences with 2905 columns, 2274 distinct patterns
+1688 parsimony-informative, 452 singleton sites, 765 constant sites
+WARNING: Some sequence names are changed as follows:
+4V9D_1|Chains/1-1539 -> 4V9D_1_Chains_1-1539
+cy.ic.aer/11555/1-1508 -> cy.ic.aer_11555_1-1508
+cy.Osc.aga/11485/1-1463 -> cy.Osc.aga_11485_1-1463
+cy.Pho.ab/11477/1-1439 -> cy.Pho.ab_11477_1-1439
+cy.Tri.ten/11478/1-1437 -> cy.Tri.ten_11478_1-1437
+pl.Zea.ay/11809/1-1809 -> pl.Zea.ay_11809_1-1809
+pl.Pan.gin/11811/1-1811 -> pl.Pan.gin_11811_1-1811
+pl.Ara.tha/11804/1-1804 -> pl.Ara.tha_11804_1-1804
+pl.Gly.ax/11807/1-1807 -> pl.Gly.ax_11807_1-1807
+pl.Pis.sat/11808/1-1808 -> pl.Pis.sat_11808_1-1808
+pl.Lyc.esc/11800/1-1800 -> pl.Lyc.esc_11800_1-1800
+pl.Sol.tub/11807/1-1807 -> pl.Sol.tub_11807_1-1807
+pl.Gin.bil/11811/1-1811 -> pl.Gin.bil_11811_1-1811
+pl.Pin.luc/11810/1-1810 -> pl.Pin.luc_11810_1-1810
+pl.Tai.cry/11811/1-1811 -> pl.Tai.cry_11811_1-1811
+pr.Sar.neu/11806/1-1806 -> pr.Sar.neu_11806_1-1806
+pr.Pla.al/12147/1-2147 -> pr.Pla.al_12147_1-2147
+pr.Sti.hel/11795/1-1795 -> pr.Sti.hel_11795_1-1795
+pr.al.at/11811/1-1811 -> pr.al.at_11811_1-1811
+pr.Cyc.gla/11763/1-1763 -> pr.Cyc.gla_11763_1-1763
+pr.Tet.bor/11752/1-1752 -> pr.Tet.bor_11752_1-1752
+pr.Rho.sal/11762/1-1762 -> pr.Rho.sal_11762_1-1762
+pr.Por.aca/11844/1-1844 -> pr.Por.aca_11844_1-1844
+pr.Bla.ho/11770/1-1770 -> pr.Bla.ho_11770_1-1770
+an.Dro.el/11995/1-1995 -> an.Dro.el_11995_1-1995
+an.La.aep/11824/1-1824 -> an.La.aep_11824_1-1824
+an.Xen.lae/11825/1-1825 -> an.Xen.lae_11825_1-1825
+an.Ho.sap/11869/1-1869 -> an.Ho.sap_11869_1-1869
+an.us.us/11869/1-1869 -> an.us.us_11869_1-1869
+an.Rat.nor/11870/1-1870 -> an.Rat.nor_11870_1-1870
+an.Ast.au/11803/1-1803 -> an.Ast.au_11803_1-1803
+an.Str.int/11814/1-1814 -> an.Str.int_11814_1-1814
+an.Cae.ele/11760/1-1760 -> an.Cae.ele_11760_1-1760
+an.Bra.pli/11810/1-1810 -> an.Bra.pli_11810_1-1810
+fu.Sch.po/11842/1-1842 -> fu.Sch.po_11842_1-1842
+fu.Asp.nid/11798/1-1798 -> fu.Asp.nid_11798_1-1798
+fu.Asp.ta/11799/1-1799 -> fu.Asp.ta_11799_1-1799
+fu.Neu.cra/11795/1-1795 -> fu.Neu.cra_11795_1-1795
+fu.Can.gla/11798/1-1798 -> fu.Can.gla_11798_1-1798
+fu.Sac.cer/11798/1-1798 -> fu.Sac.cer_11798_1-1798
+fu.Bul.hui/11801/1-1801 -> fu.Bul.hui_11801_1-1801
+fu.Den.sul/11799/1-1799 -> fu.Den.sul_11799_1-1799
+fu.Fel.oga/11794/1-1794 -> fu.Fel.oga_11794_1-1794
+fu.Gig.ar/11803/1-1803 -> fu.Gig.ar_11803_1-1803
+fl.Bac.spl/11520/1-1520 -> fl.Bac.spl_11520_1-1520
+fl.Cyt.ar/11526/1-1526 -> fl.Cyt.ar_11526_1-1526
+fl.Fla.xan/11504/1-1504 -> fl.Fla.xan_11504_1-1504
+fl.ar.psy/11508/1-1508 -> fl.ar.psy_11508_1-1508
+fl.Pre.eno/11521/1-1521 -> fl.Pre.eno_11521_1-1521
+fu.Fus.gon/11505/1-1457 -> fu.Fus.gon_11505_1-1457
+fu.Fus.nul/11507/1-1331 -> fu.Fus.nul_11507_1-1331
+fu.Lep.buc/11503/1-1468 -> fu.Lep.buc_11503_1-1468
+fu.Lep.ic/11506/1-1462 -> fu.Lep.ic_11506_1-1462
+gr.The.ros/11528/1-1528 -> gr.The.ros_11528_1-1528
+pt.Iso.pal/11511/1-1460 -> pt.Iso.pal_11511_1-1460
+pt.Pla.bra/11507/1-1150 -> pt.Pla.bra_11507_1-1150
+pt.Pla.ar/11527/1-1156 -> pt.Pla.ar_11527_1-1156
+ch.Zea.ay/11491/1-1491 -> ch.Zea.ay_11491_1-1491
+ch.Dau.car/11486/1-1484 -> ch.Dau.car_11486_1-1484
+ch.Gly.ax/11471/1-1470 -> ch.Gly.ax_11471_1-1470
+ch.Pis.sat/11487/1-1487 -> ch.Pis.sat_11487_1-1487
+ch.Nic.tab/11486/1-1486 -> ch.Nic.tab_11486_1-1486
+ch.Pin.thu/11491/1-1491 -> ch.Pin.thu_11491_1-1491
+ch.Chl.ir/11629/1-1629 -> ch.Chl.ir_11629_1-1629
+ch.Eug.gra/11498/1-1496 -> ch.Eug.gra_11498_1-1496
+ch.Cya.par/11495/1-1495 -> ch.Cya.par_11495_1-1495
+ch.Cya.cal/11492/1-1492 -> ch.Cya.cal_11492_1-1492
+ga.Esc.col/11542/1-1542 -> ga.Esc.col_11542_1-1542
+ga.Hae.par/11535/1-1483 -> ga.Hae.par_11535_1-1483
+ga.Leg.lyt/11531/1-1432 -> ga.Leg.lyt_11531_1-1432
+ga.ar.psy/11537/1-1502 -> ga.ar.psy_11537_1-1502
+ga.Oce.pus/11495/1-1447 -> ga.Oce.pus_11495_1-1447
+ga.Pho.pho/11533/1-1465 -> ga.Pho.pho_11533_1-1465
+ga.Pse.asp/11526/1-1491 -> ga.Pse.asp_11526_1-1491
+ga.Sal.typ/11536/1-1534 -> ga.Sal.typ_11536_1-1534
+ga.Vib.cho/11540/1-1538 -> ga.Vib.cho_11540_1-1538
+ga.Xan.pis/11537/1-1502 -> ga.Xan.pis_11537_1-1502
+ra.Dei.ur/11498/1-1472 -> ra.Dei.ur_11498_1-1472
+ra.Dei.rad/11502/1-1502 -> ra.Dei.rad_11502_1-1502
+sp.Bor.par/11526/1-1522 -> sp.Bor.par_11526_1-1522
+sp.Lep.ey/11497/1-1418 -> sp.Lep.ey_11497_1-1418
+sp.Tre.soc/11527/1-1404 -> sp.Tre.soc_11527_1-1404
+sp.Tre.suc/11569/1-1510 -> sp.Tre.suc_11569_1-1510
+th.The.afr/11563/1-1403 -> th.The.afr_11563_1-1403
+th.The.hyp/11538/1-1521 -> th.The.hyp_11538_1-1521
+th.The.sub/11545/1-1481 -> th.The.sub_11545_1-1481
+ar.Sul.sol/11494/1-1493 -> ar.Sul.sol_11494_1-1493
+ar.The.pen/11511/1-1509 -> ar.The.pen_11511_1-1509
+ar.Hal.val/11471/1-1471 -> ar.Hal.val_11471_1-1471
+ar.Hal.sac/11469/1-1469 -> ar.Hal.sac_11469_1-1469
+ar.Nat.ag/11466/1-1466 -> ar.Nat.ag_11466_1-1466
+ar.et.fer/11486/1-1481 -> ar.et.fer_11486_1-1481
+ar.et.jan/11476/1-1475 -> ar.et.jan_11476_1-1475
+ar.et.ore/11475/1-1421 -> ar.et.ore_11475_1-1421
+ar.The.chi/11494/1-1427 -> ar.The.chi_11494_1-1427
+ar.The.ste/11497/1-1463 -> ar.The.ste_11497_1-1463
+hi.Act.eur/11531/1-1410 -> hi.Act.eur_11531_1-1410
+hi.Bif.inf/11523/1-1474 -> hi.Bif.inf_11523_1-1474
+hi.Cel.cel/11513/1-1453 -> hi.Cel.cel_11513_1-1453
+hi.Cor.oti/11538/1-1461 -> hi.Cor.oti_11538_1-1461
+hi.ic.par/11511/1-1414 -> hi.ic.par_11511_1-1414
+hi.ic.ech/11505/1-1465 -> hi.ic.ech_11505_1-1465
+hi.yc.cel/11519/1-1460 -> hi.yc.cel_11519_1-1460
+hi.yc.int/11510/1-1441 -> hi.yc.int_11510_1-1441
+hi.Noc.fla/11505/1-1470 -> hi.Noc.fla_11505_1-1470
+hi.Str.ri/11529/1-1529 -> hi.Str.ri_11529_1-1529
+lo.Ach.lai/11501/1-1480 -> lo.Ach.lai_11501_1-1480
+lo.Bac.alc/11537/1-1424 -> lo.Bac.alc_11537_1-1424
+lo.Bac.sub/11550/1-1550 -> lo.Bac.sub_11550_1-1550
+lo.Car.ob/11544/1-1385 -> lo.Car.ob_11544_1-1385
+lo.Eub.lac/11522/1-1401 -> lo.Eub.lac_11522_1-1401
+lo.Lac.car/11551/1-1503 -> lo.Lac.car_11551_1-1503
+lo.yc.cap/11521/1-1521 -> lo.yc.cap_11521_1-1521
+lo.yc.yc/11513/1-1466 -> lo.yc.yc_11513_1-1466
+lo.Spi.cit/11530/1-1530 -> lo.Spi.cit_11530_1-1530
+lo.Sta.ho/11546/1-1544 -> lo.Sta.ho_11546_1-1544
+t.Sac.cer/11669/1-1669 -> t.Sac.cer_11669_1-1669
+t.Gly.ax/11990/1-1990 -> t.Gly.ax_11990_1-1990
+t.Zea.ay/11968/1-1968 -> t.Zea.ay_11968_1-1968
+t.Tet.pyr/11660/1-1660 -> t.Tet.pyr_11660_1-1660
+al.Aci.cry/11481/1-1413 -> al.Aci.cry_11481_1-1413
+al.et.rho/11475/1-1407 -> al.et.rho_11475_1-1407
+al.Rhi.fre/11481/1-1481 -> al.Rhi.fre_11481_1-1481
+al.Ric.pea/11489/1-1157 -> al.Ric.pea_11489_1-1157
+al.Sph.ter/11472/1-1417 -> al.Sph.ter_11472_1-1417
+be.Hyd.pal/11519/1-1480 -> be.Hyd.pal_11519_1-1480
+be.Nei.fla/11534/1-1486 -> be.Nei.fla_11534_1-1486
+be.Pse.syz/11521/1-1445 -> be.Pse.syz_11521_1-1445
+be.Rho.pur/11534/1-1478 -> be.Rho.pur_11534_1-1478
+be.Tha.ter/11528/1-1484 -> be.Tha.ter_11528_1-1484
+de.Des.vib/11550/1-1516 -> de.Des.vib_11550_1-1516
+de.Des.ter/11537/1-1506 -> de.Des.ter_11537_1-1506
+de.Des.suc/11521/1-1435 -> de.Des.suc_11521_1-1435
+ep.Alv.po/11504/1-1502 -> ep.Alv.po_11504_1-1502
+ep.Ca.fet/11509/1-1461 -> ep.Ca.fet_11509_1-1461
+ep.Ca.lar/11507/1-1459 -> ep.Ca.lar_11507_1-1459
+ep.Hel.pyl/11498/1-1450 -> ep.Hel.pyl_11498_1-1450
+ep.Hel.tro/11486/1-1422 -> ep.Hel.tro_11486_1-1422
+un.Aer.ar/11550/1-1488 -> un.Aer.ar_11550_1-1488
+un.Fle.sin/11548/1-1500 -> un.Fle.sin_11548_1-1500
+un.ag.bav/11515/1-1513 -> un.ag.bav_11515_1-1513
+
+                         Gap/Ambiguity  Composition  p-value
+   1  4V9D_1_Chains_1-1539      47.02%    passed     27.85%
+   2  cy.ic.aer_11555_1-1508    48.09%    passed      7.48%
+   3  cy.Osc.aga_11485_1-1463   49.64%    failed      1.16%
+   4  cy.Pho.ab_11477_1-1439    50.46%    passed     15.93%
+   5  cy.Tri.ten_11478_1-1437   50.53%    passed      5.69%
+   6  pl.Zea.ay_11809_1-1809    37.73%    passed      7.58%
+   7  pl.Pan.gin_11811_1-1811   37.73%    failed      0.22%
+   8  pl.Ara.tha_11804_1-1804   37.90%    failed      0.22%
+   9  pl.Gly.ax_11807_1-1807    37.80%    failed      0.08%
+  10  pl.Pis.sat_11808_1-1808   40.69%    failed      0.29%
+  11  pl.Lyc.esc_11800_1-1800   38.04%    failed      0.39%
+  12  pl.Sol.tub_11807_1-1807   37.80%    failed      0.43%
+  13  pl.Gin.bil_11811_1-1811   40.38%    failed      3.61%
+  14  pl.Pin.luc_11810_1-1810   40.41%    failed      0.94%
+  15  pl.Tai.cry_11811_1-1811   40.38%    failed      2.40%
+  16  pr.Sar.neu_11806_1-1806   37.93%    failed      0.00%
+  17  pr.Pla.al_12147_1-2147    26.09%    failed      0.00%
+  18  pr.Sti.hel_11795_1-1795   40.34%    failed      0.04%
+  19  pr.al.at_11811_1-1811     37.66%    failed      0.00%
+  20  pr.Cyc.gla_11763_1-1763   41.07%    failed      0.00%
+  21  pr.Tet.bor_11752_1-1752   39.69%    failed      0.00%
+  22  pr.Rho.sal_11762_1-1762   39.35%    failed      0.00%
+  23  pr.Por.aca_11844_1-1844   38.18%    failed      0.01%
+  24  pr.Bla.ho_11770_1-1770    40.76%    failed      0.00%
+  25  an.Dro.el_11995_1-1995    31.33%    failed      0.00%
+  26  an.La.aep_11824_1-1824    38.59%    passed     11.34%
+  27  an.Xen.lae_11825_1-1825   37.18%    failed      1.07%
+  28  an.Ho.sap_11869_1-1869    35.66%    failed      0.01%
+  29  an.us.us_11869_1-1869     35.66%    failed      0.01%
+  30  an.Rat.nor_11870_1-1870   35.63%    failed      0.01%
+  31  an.Ast.au_11803_1-1803    42.75%    passed     10.55%
+  32  an.Str.int_11814_1-1814   42.55%    passed     20.08%
+  33  an.Cae.ele_11760_1-1760   39.41%    failed      0.00%
+  34  an.Bra.pli_11810_1-1810   40.24%    failed      0.00%
+  35  fu.Sch.po_11842_1-1842    36.59%    failed      0.00%
+  36  fu.Asp.nid_11798_1-1798   42.48%    failed      3.63%
+  37  fu.Asp.ta_11799_1-1799    40.34%    failed      0.93%
+  38  fu.Neu.cra_11795_1-1795   38.21%    failed      0.05%
+  39  fu.Can.gla_11798_1-1798   38.11%    failed      0.00%
+  40  fu.Sac.cer_11798_1-1798   38.11%    failed      0.00%
+  41  fu.Bul.hui_11801_1-1801   40.31%    failed      0.00%
+  42  fu.Den.sul_11799_1-1799   39.55%    failed      0.00%
+  43  fu.Fel.oga_11794_1-1794   39.79%    failed      0.00%
+  44  fu.Gig.ar_11803_1-1803    39.83%    failed      0.00%
+  45  fl.Bac.spl_11520_1-1520   49.81%    passed     66.71%
+  46  fl.Cyt.ar_11526_1-1526    49.64%    passed     37.70%
+  47  fl.Fla.xan_11504_1-1504   50.09%    passed     10.69%
+  48  fl.ar.psy_11508_1-1508    51.05%    passed     35.79%
+  49  fl.Pre.eno_11521_1-1521   50.26%    passed     71.42%
+  50  fu.Fus.gon_11505_1-1457   50.43%    passed     49.85%
+  51  fu.Fus.nul_11507_1-1331   54.70%    passed      6.57%
+  52  fu.Lep.buc_11503_1-1468   49.88%    passed     27.38%
+  53  fu.Lep.ic_11506_1-1462    49.95%    failed      0.00%
+  54  gr.The.ros_11528_1-1528   47.61%    failed      0.00%
+  55  pt.Iso.pal_11511_1-1460   50.67%    failed      0.00%
+  56  pt.Pla.bra_11507_1-1150   60.41%    passed     20.67%
+  57  pt.Pla.ar_11527_1-1156    60.24%    passed     31.34%
+  58  ch.Zea.ay_11491_1-1491    48.67%    failed      2.13%
+  59  ch.Dau.car_11486_1-1484   48.92%    failed      1.04%
+  60  ch.Gly.ax_11471_1-1470    49.40%    failed      3.43%
+  61  ch.Pis.sat_11487_1-1487   48.81%    passed     12.40%
+  62  ch.Nic.tab_11486_1-1486   48.85%    failed      0.72%
+  63  ch.Pin.thu_11491_1-1491   48.67%    failed      0.42%
+  64  ch.Chl.ir_11629_1-1629    44.13%    passed     51.47%
+  65  ch.Eug.gra_11498_1-1496   48.50%    failed      0.00%
+  66  ch.Cya.par_11495_1-1495   48.54%    passed     83.35%
+  67  ch.Cya.cal_11492_1-1492   48.64%    failed      1.05%
+  68  ga.Esc.col_11542_1-1542   46.92%    passed     30.09%
+  69  ga.Hae.par_11535_1-1483   49.88%    passed     56.80%
+  70  ga.Leg.lyt_11531_1-1432   50.71%    passed     11.38%
+  71  ga.ar.psy_11537_1-1502    48.33%    passed     53.14%
+  72  ga.Oce.pus_11495_1-1447   50.50%    passed     87.48%
+  73  ga.Pho.pho_11533_1-1465   49.64%    passed     57.91%
+  74  ga.Pse.asp_11526_1-1491   48.74%    passed     49.59%
+  75  ga.Sal.typ_11536_1-1534   47.19%    passed     23.34%
+  76  ga.Vib.cho_11540_1-1538   47.13%    passed     41.00%
+  77  ga.Xan.pis_11537_1-1502   48.33%    passed     13.09%
+  78  ra.Dei.ur_11498_1-1472    49.33%    failed      0.05%
+  79  ra.Dei.rad_11502_1-1502   48.30%    passed     10.59%
+  80  sp.Bor.par_11526_1-1522   47.61%    failed      0.04%
+  81  sp.Lep.ey_11497_1-1418    51.26%    passed     70.41%
+  82  sp.Tre.soc_11527_1-1404   51.67%    failed      0.00%
+  83  sp.Tre.suc_11569_1-1510   48.92%    failed      0.00%
+  84  th.The.afr_11563_1-1403   52.60%    failed      0.00%
+  85  th.The.hyp_11538_1-1521   47.75%    failed      0.00%
+  86  th.The.sub_11545_1-1481   49.02%    failed      0.00%
+  87  ar.Sul.sol_11494_1-1493   48.61%    failed      0.00%
+  88  ar.The.pen_11511_1-1509   48.06%    failed      0.00%
+  89  ar.Hal.val_11471_1-1471   49.36%    failed      0.60%
+  90  ar.Hal.sac_11469_1-1469   49.43%    failed      0.00%
+  91  ar.Nat.ag_11466_1-1466    49.54%    failed      0.11%
+  92  ar.et.fer_11486_1-1481    49.02%    failed      0.00%
+  93  ar.et.jan_11476_1-1475    49.23%    failed      0.00%
+  94  ar.et.ore_11475_1-1421    51.53%    passed      7.03%
+  95  ar.The.chi_11494_1-1427   51.15%    failed      0.00%
+  96  ar.The.ste_11497_1-1463   49.64%    failed      0.00%
+  97  hi.Act.eur_11531_1-1410   51.53%    failed      0.02%
+  98  hi.Bif.inf_11523_1-1474   51.29%    failed      0.00%
+  99  hi.Cel.cel_11513_1-1453   49.98%    failed      0.03%
+ 100  hi.Cor.oti_11538_1-1461   49.91%    failed      0.01%
+ 101  hi.ic.par_11511_1-1414    51.33%    failed      0.00%
+ 102  hi.ic.ech_11505_1-1465    49.57%    failed      0.00%
+ 103  hi.yc.cel_11519_1-1460    49.78%    failed      0.00%
+ 104  hi.yc.int_11510_1-1441    50.40%    failed      0.01%
+ 105  hi.Noc.fla_11505_1-1470   49.40%    failed      0.05%
+ 106  hi.Str.ri_11529_1-1529    47.37%    failed      0.00%
+ 107  lo.Ach.lai_11501_1-1480   49.05%    failed      0.52%
+ 108  lo.Bac.alc_11537_1-1424   51.15%    passed     54.85%
+ 109  lo.Bac.sub_11550_1-1550   46.64%    passed     24.06%
+ 110  lo.Car.ob_11544_1-1385    54.01%    passed     71.38%
+ 111  lo.Eub.lac_11522_1-1401   52.05%    passed      9.42%
+ 112  lo.Lac.car_11551_1-1503   49.19%    passed     85.33%
+ 113  lo.yc.cap_11521_1-1521    47.64%    failed      0.32%
+ 114  lo.yc.yc_11513_1-1466     49.54%    failed      0.65%
+ 115  lo.Spi.cit_11530_1-1530   47.33%    failed      3.44%
+ 116  lo.Sta.ho_11546_1-1544    46.92%    passed     63.08%
+ 117  t.Sac.cer_11669_1-1669    42.55%    failed      0.00%
+ 118  t.Gly.ax_11990_1-1990     31.50%    passed     83.22%
+ 119  t.Zea.ay_11968_1-1968     32.25%    passed     34.80%
+ 120  t.Tet.pyr_11660_1-1660    42.86%    failed      0.00%
+ 121  al.Aci.cry_11481_1-1413   51.36%    failed      0.51%
+ 122  al.et.rho_11475_1-1407    51.57%    failed      0.43%
+ 123  al.Rhi.fre_11481_1-1481   49.12%    passed      9.19%
+ 124  al.Ric.pea_11489_1-1157   60.17%    passed     55.28%
+ 125  al.Sph.ter_11472_1-1417   51.22%    passed     66.57%
+ 126  be.Hyd.pal_11519_1-1480   49.05%    failed      3.63%
+ 127  be.Nei.fla_11534_1-1486   49.33%    passed     74.46%
+ 128  be.Pse.syz_11521_1-1445   50.26%    passed     22.73%
+ 129  be.Rho.pur_11534_1-1478   49.36%    passed      7.93%
+ 130  be.Tha.ter_11528_1-1484   48.92%    passed      5.87%
+ 131  de.Des.vib_11550_1-1516   47.85%    passed     72.19%
+ 132  de.Des.ter_11537_1-1506   48.85%    failed      0.21%
+ 133  de.Des.suc_11521_1-1435   50.64%    passed     35.71%
+ 134  ep.Alv.po_11504_1-1502    48.36%    passed      6.59%
+ 135  ep.Ca.fet_11509_1-1461    50.19%    failed      4.11%
+ 136  ep.Ca.lar_11507_1-1459    49.98%    passed     33.61%
+ 137  ep.Hel.pyl_11498_1-1450   50.29%    passed     43.56%
+ 138  ep.Hel.tro_11486_1-1422   51.05%    passed     67.49%
+ 139  un.Aer.ar_11550_1-1488    48.81%    failed      0.00%
+ 140  un.Fle.sin_11548_1-1500   49.29%    passed     16.98%
+ 141  un.ag.bav_11515_1-1513    47.92%    passed     12.07%
+WARNING: 33 sequences contain more than 50% gaps/ambiguity
+****  TOTAL                     46.33%  84 sequences failed composition chi2 test (p-value<5%; df=3)
+
+
+Create initial parsimony tree by phylogenetic likelihood library (PLL)... 0.057 seconds
+NOTE: ModelFinder requires 104 MB RAM!
+ModelFinder will test 286 DNA models (sample size: 2905) ...
+ No. Model         -LnL         df  AIC          AICc         BIC
+  1  JC            102604.635   279 205767.271   205826.791   207434.069
+  2  JC+I          100835.582   280 202231.164   202291.133   203903.936
+  3  JC+G4         93224.885    280 187009.770   187069.740   188682.543
+  4  JC+I+G4       93177.720    281 186917.440   186977.861   188596.187
+  5  JC+R2         94851.042    281 190264.084   190324.505   191942.831
+
+******************************************************
+CHECKPOINT: Resuming analysis from 16s_wstruct.aln.filter.fasta.ckp.gz
+
+IQ-TREE multicore version 1.6.1 for Linux 64-bit built Feb 16 2018
+Developed by Bui Quang Minh, Nguyen Lam Tung, Olga Chernomor,
+Heiko Schmidt, Dominik Schrempf, Michael Woodhams.
+
+Host:    megazord (AVX2, FMA3, 62 GB RAM)
+Command: iqtree -s 16s_wstruct.aln.filter.fasta -nt 8
+Seed:    850279 (Using SPRNG - Scalable Parallel Random Number Generator)
+Time:    Thu Feb 18 14:33:15 2021
+Kernel:  AVX+FMA - 8 threads (8 CPU cores detected)
+
+WARNING: Command-line argument `-nt` differs from checkpoint `-m`
+WARNING: Command-line argument `8` differs from checkpoint `HKY+P`
+WARNING: Command-line differs from checkpoint!
+Reading alignment file 16s_wstruct.aln.filter.fasta ... Fasta format detected
+Alignment most likely contains DNA/RNA sequences
+WARNING: 23 sites contain only gaps or ambiguous characters.
+Alignment has 141 sequences with 2905 columns, 2274 distinct patterns
+1688 parsimony-informative, 452 singleton sites, 765 constant sites
+WARNING: Some sequence names are changed as follows:
+4V9D_1|Chains/1-1539 -> 4V9D_1_Chains_1-1539
+cy.ic.aer/11555/1-1508 -> cy.ic.aer_11555_1-1508
+cy.Osc.aga/11485/1-1463 -> cy.Osc.aga_11485_1-1463
+cy.Pho.ab/11477/1-1439 -> cy.Pho.ab_11477_1-1439
+cy.Tri.ten/11478/1-1437 -> cy.Tri.ten_11478_1-1437
+pl.Zea.ay/11809/1-1809 -> pl.Zea.ay_11809_1-1809
+pl.Pan.gin/11811/1-1811 -> pl.Pan.gin_11811_1-1811
+pl.Ara.tha/11804/1-1804 -> pl.Ara.tha_11804_1-1804
+pl.Gly.ax/11807/1-1807 -> pl.Gly.ax_11807_1-1807
+pl.Pis.sat/11808/1-1808 -> pl.Pis.sat_11808_1-1808
+pl.Lyc.esc/11800/1-1800 -> pl.Lyc.esc_11800_1-1800
+pl.Sol.tub/11807/1-1807 -> pl.Sol.tub_11807_1-1807
+pl.Gin.bil/11811/1-1811 -> pl.Gin.bil_11811_1-1811
+pl.Pin.luc/11810/1-1810 -> pl.Pin.luc_11810_1-1810
+pl.Tai.cry/11811/1-1811 -> pl.Tai.cry_11811_1-1811
+pr.Sar.neu/11806/1-1806 -> pr.Sar.neu_11806_1-1806
+pr.Pla.al/12147/1-2147 -> pr.Pla.al_12147_1-2147
+pr.Sti.hel/11795/1-1795 -> pr.Sti.hel_11795_1-1795
+pr.al.at/11811/1-1811 -> pr.al.at_11811_1-1811
+pr.Cyc.gla/11763/1-1763 -> pr.Cyc.gla_11763_1-1763
+pr.Tet.bor/11752/1-1752 -> pr.Tet.bor_11752_1-1752
+pr.Rho.sal/11762/1-1762 -> pr.Rho.sal_11762_1-1762
+pr.Por.aca/11844/1-1844 -> pr.Por.aca_11844_1-1844
+pr.Bla.ho/11770/1-1770 -> pr.Bla.ho_11770_1-1770
+an.Dro.el/11995/1-1995 -> an.Dro.el_11995_1-1995
+an.La.aep/11824/1-1824 -> an.La.aep_11824_1-1824
+an.Xen.lae/11825/1-1825 -> an.Xen.lae_11825_1-1825
+an.Ho.sap/11869/1-1869 -> an.Ho.sap_11869_1-1869
+an.us.us/11869/1-1869 -> an.us.us_11869_1-1869
+an.Rat.nor/11870/1-1870 -> an.Rat.nor_11870_1-1870
+an.Ast.au/11803/1-1803 -> an.Ast.au_11803_1-1803
+an.Str.int/11814/1-1814 -> an.Str.int_11814_1-1814
+an.Cae.ele/11760/1-1760 -> an.Cae.ele_11760_1-1760
+an.Bra.pli/11810/1-1810 -> an.Bra.pli_11810_1-1810
+fu.Sch.po/11842/1-1842 -> fu.Sch.po_11842_1-1842
+fu.Asp.nid/11798/1-1798 -> fu.Asp.nid_11798_1-1798
+fu.Asp.ta/11799/1-1799 -> fu.Asp.ta_11799_1-1799
+fu.Neu.cra/11795/1-1795 -> fu.Neu.cra_11795_1-1795
+fu.Can.gla/11798/1-1798 -> fu.Can.gla_11798_1-1798
+fu.Sac.cer/11798/1-1798 -> fu.Sac.cer_11798_1-1798
+fu.Bul.hui/11801/1-1801 -> fu.Bul.hui_11801_1-1801
+fu.Den.sul/11799/1-1799 -> fu.Den.sul_11799_1-1799
+fu.Fel.oga/11794/1-1794 -> fu.Fel.oga_11794_1-1794
+fu.Gig.ar/11803/1-1803 -> fu.Gig.ar_11803_1-1803
+fl.Bac.spl/11520/1-1520 -> fl.Bac.spl_11520_1-1520
+fl.Cyt.ar/11526/1-1526 -> fl.Cyt.ar_11526_1-1526
+fl.Fla.xan/11504/1-1504 -> fl.Fla.xan_11504_1-1504
+fl.ar.psy/11508/1-1508 -> fl.ar.psy_11508_1-1508
+fl.Pre.eno/11521/1-1521 -> fl.Pre.eno_11521_1-1521
+fu.Fus.gon/11505/1-1457 -> fu.Fus.gon_11505_1-1457
+fu.Fus.nul/11507/1-1331 -> fu.Fus.nul_11507_1-1331
+fu.Lep.buc/11503/1-1468 -> fu.Lep.buc_11503_1-1468
+fu.Lep.ic/11506/1-1462 -> fu.Lep.ic_11506_1-1462
+gr.The.ros/11528/1-1528 -> gr.The.ros_11528_1-1528
+pt.Iso.pal/11511/1-1460 -> pt.Iso.pal_11511_1-1460
+pt.Pla.bra/11507/1-1150 -> pt.Pla.bra_11507_1-1150
+pt.Pla.ar/11527/1-1156 -> pt.Pla.ar_11527_1-1156
+ch.Zea.ay/11491/1-1491 -> ch.Zea.ay_11491_1-1491
+ch.Dau.car/11486/1-1484 -> ch.Dau.car_11486_1-1484
+ch.Gly.ax/11471/1-1470 -> ch.Gly.ax_11471_1-1470
+ch.Pis.sat/11487/1-1487 -> ch.Pis.sat_11487_1-1487
+ch.Nic.tab/11486/1-1486 -> ch.Nic.tab_11486_1-1486
+ch.Pin.thu/11491/1-1491 -> ch.Pin.thu_11491_1-1491
+ch.Chl.ir/11629/1-1629 -> ch.Chl.ir_11629_1-1629
+ch.Eug.gra/11498/1-1496 -> ch.Eug.gra_11498_1-1496
+ch.Cya.par/11495/1-1495 -> ch.Cya.par_11495_1-1495
+ch.Cya.cal/11492/1-1492 -> ch.Cya.cal_11492_1-1492
+ga.Esc.col/11542/1-1542 -> ga.Esc.col_11542_1-1542
+ga.Hae.par/11535/1-1483 -> ga.Hae.par_11535_1-1483
+ga.Leg.lyt/11531/1-1432 -> ga.Leg.lyt_11531_1-1432
+ga.ar.psy/11537/1-1502 -> ga.ar.psy_11537_1-1502
+ga.Oce.pus/11495/1-1447 -> ga.Oce.pus_11495_1-1447
+ga.Pho.pho/11533/1-1465 -> ga.Pho.pho_11533_1-1465
+ga.Pse.asp/11526/1-1491 -> ga.Pse.asp_11526_1-1491
+ga.Sal.typ/11536/1-1534 -> ga.Sal.typ_11536_1-1534
+ga.Vib.cho/11540/1-1538 -> ga.Vib.cho_11540_1-1538
+ga.Xan.pis/11537/1-1502 -> ga.Xan.pis_11537_1-1502
+ra.Dei.ur/11498/1-1472 -> ra.Dei.ur_11498_1-1472
+ra.Dei.rad/11502/1-1502 -> ra.Dei.rad_11502_1-1502
+sp.Bor.par/11526/1-1522 -> sp.Bor.par_11526_1-1522
+sp.Lep.ey/11497/1-1418 -> sp.Lep.ey_11497_1-1418
+sp.Tre.soc/11527/1-1404 -> sp.Tre.soc_11527_1-1404
+sp.Tre.suc/11569/1-1510 -> sp.Tre.suc_11569_1-1510
+th.The.afr/11563/1-1403 -> th.The.afr_11563_1-1403
+th.The.hyp/11538/1-1521 -> th.The.hyp_11538_1-1521
+th.The.sub/11545/1-1481 -> th.The.sub_11545_1-1481
+ar.Sul.sol/11494/1-1493 -> ar.Sul.sol_11494_1-1493
+ar.The.pen/11511/1-1509 -> ar.The.pen_11511_1-1509
+ar.Hal.val/11471/1-1471 -> ar.Hal.val_11471_1-1471
+ar.Hal.sac/11469/1-1469 -> ar.Hal.sac_11469_1-1469
+ar.Nat.ag/11466/1-1466 -> ar.Nat.ag_11466_1-1466
+ar.et.fer/11486/1-1481 -> ar.et.fer_11486_1-1481
+ar.et.jan/11476/1-1475 -> ar.et.jan_11476_1-1475
+ar.et.ore/11475/1-1421 -> ar.et.ore_11475_1-1421
+ar.The.chi/11494/1-1427 -> ar.The.chi_11494_1-1427
+ar.The.ste/11497/1-1463 -> ar.The.ste_11497_1-1463
+hi.Act.eur/11531/1-1410 -> hi.Act.eur_11531_1-1410
+hi.Bif.inf/11523/1-1474 -> hi.Bif.inf_11523_1-1474
+hi.Cel.cel/11513/1-1453 -> hi.Cel.cel_11513_1-1453
+hi.Cor.oti/11538/1-1461 -> hi.Cor.oti_11538_1-1461
+hi.ic.par/11511/1-1414 -> hi.ic.par_11511_1-1414
+hi.ic.ech/11505/1-1465 -> hi.ic.ech_11505_1-1465
+hi.yc.cel/11519/1-1460 -> hi.yc.cel_11519_1-1460
+hi.yc.int/11510/1-1441 -> hi.yc.int_11510_1-1441
+hi.Noc.fla/11505/1-1470 -> hi.Noc.fla_11505_1-1470
+hi.Str.ri/11529/1-1529 -> hi.Str.ri_11529_1-1529
+lo.Ach.lai/11501/1-1480 -> lo.Ach.lai_11501_1-1480
+lo.Bac.alc/11537/1-1424 -> lo.Bac.alc_11537_1-1424
+lo.Bac.sub/11550/1-1550 -> lo.Bac.sub_11550_1-1550
+lo.Car.ob/11544/1-1385 -> lo.Car.ob_11544_1-1385
+lo.Eub.lac/11522/1-1401 -> lo.Eub.lac_11522_1-1401
+lo.Lac.car/11551/1-1503 -> lo.Lac.car_11551_1-1503
+lo.yc.cap/11521/1-1521 -> lo.yc.cap_11521_1-1521
+lo.yc.yc/11513/1-1466 -> lo.yc.yc_11513_1-1466
+lo.Spi.cit/11530/1-1530 -> lo.Spi.cit_11530_1-1530
+lo.Sta.ho/11546/1-1544 -> lo.Sta.ho_11546_1-1544
+t.Sac.cer/11669/1-1669 -> t.Sac.cer_11669_1-1669
+t.Gly.ax/11990/1-1990 -> t.Gly.ax_11990_1-1990
+t.Zea.ay/11968/1-1968 -> t.Zea.ay_11968_1-1968
+t.Tet.pyr/11660/1-1660 -> t.Tet.pyr_11660_1-1660
+al.Aci.cry/11481/1-1413 -> al.Aci.cry_11481_1-1413
+al.et.rho/11475/1-1407 -> al.et.rho_11475_1-1407
+al.Rhi.fre/11481/1-1481 -> al.Rhi.fre_11481_1-1481
+al.Ric.pea/11489/1-1157 -> al.Ric.pea_11489_1-1157
+al.Sph.ter/11472/1-1417 -> al.Sph.ter_11472_1-1417
+be.Hyd.pal/11519/1-1480 -> be.Hyd.pal_11519_1-1480
+be.Nei.fla/11534/1-1486 -> be.Nei.fla_11534_1-1486
+be.Pse.syz/11521/1-1445 -> be.Pse.syz_11521_1-1445
+be.Rho.pur/11534/1-1478 -> be.Rho.pur_11534_1-1478
+be.Tha.ter/11528/1-1484 -> be.Tha.ter_11528_1-1484
+de.Des.vib/11550/1-1516 -> de.Des.vib_11550_1-1516
+de.Des.ter/11537/1-1506 -> de.Des.ter_11537_1-1506
+de.Des.suc/11521/1-1435 -> de.Des.suc_11521_1-1435
+ep.Alv.po/11504/1-1502 -> ep.Alv.po_11504_1-1502
+ep.Ca.fet/11509/1-1461 -> ep.Ca.fet_11509_1-1461
+ep.Ca.lar/11507/1-1459 -> ep.Ca.lar_11507_1-1459
+ep.Hel.pyl/11498/1-1450 -> ep.Hel.pyl_11498_1-1450
+ep.Hel.tro/11486/1-1422 -> ep.Hel.tro_11486_1-1422
+un.Aer.ar/11550/1-1488 -> un.Aer.ar_11550_1-1488
+un.Fle.sin/11548/1-1500 -> un.Fle.sin_11548_1-1500
+un.ag.bav/11515/1-1513 -> un.ag.bav_11515_1-1513
+
+                         Gap/Ambiguity  Composition  p-value
+   1  4V9D_1_Chains_1-1539      47.02%    passed     27.85%
+   2  cy.ic.aer_11555_1-1508    48.09%    passed      7.48%
+   3  cy.Osc.aga_11485_1-1463   49.64%    failed      1.16%
+   4  cy.Pho.ab_11477_1-1439    50.46%    passed     15.93%
+   5  cy.Tri.ten_11478_1-1437   50.53%    passed      5.69%
+   6  pl.Zea.ay_11809_1-1809    37.73%    passed      7.58%
+   7  pl.Pan.gin_11811_1-1811   37.73%    failed      0.22%
+   8  pl.Ara.tha_11804_1-1804   37.90%    failed      0.22%
+   9  pl.Gly.ax_11807_1-1807    37.80%    failed      0.08%
+  10  pl.Pis.sat_11808_1-1808   40.69%    failed      0.29%
+  11  pl.Lyc.esc_11800_1-1800   38.04%    failed      0.39%
+  12  pl.Sol.tub_11807_1-1807   37.80%    failed      0.43%
+  13  pl.Gin.bil_11811_1-1811   40.38%    failed      3.61%
+  14  pl.Pin.luc_11810_1-1810   40.41%    failed      0.94%
+  15  pl.Tai.cry_11811_1-1811   40.38%    failed      2.40%
+  16  pr.Sar.neu_11806_1-1806   37.93%    failed      0.00%
+  17  pr.Pla.al_12147_1-2147    26.09%    failed      0.00%
+  18  pr.Sti.hel_11795_1-1795   40.34%    failed      0.04%
+  19  pr.al.at_11811_1-1811     37.66%    failed      0.00%
+  20  pr.Cyc.gla_11763_1-1763   41.07%    failed      0.00%
+  21  pr.Tet.bor_11752_1-1752   39.69%    failed      0.00%
+  22  pr.Rho.sal_11762_1-1762   39.35%    failed      0.00%
+  23  pr.Por.aca_11844_1-1844   38.18%    failed      0.01%
+  24  pr.Bla.ho_11770_1-1770    40.76%    failed      0.00%
+  25  an.Dro.el_11995_1-1995    31.33%    failed      0.00%
+  26  an.La.aep_11824_1-1824    38.59%    passed     11.34%
+  27  an.Xen.lae_11825_1-1825   37.18%    failed      1.07%
+  28  an.Ho.sap_11869_1-1869    35.66%    failed      0.01%
+  29  an.us.us_11869_1-1869     35.66%    failed      0.01%
+  30  an.Rat.nor_11870_1-1870   35.63%    failed      0.01%
+  31  an.Ast.au_11803_1-1803    42.75%    passed     10.55%
+  32  an.Str.int_11814_1-1814   42.55%    passed     20.08%
+  33  an.Cae.ele_11760_1-1760   39.41%    failed      0.00%
+  34  an.Bra.pli_11810_1-1810   40.24%    failed      0.00%
+  35  fu.Sch.po_11842_1-1842    36.59%    failed      0.00%
+  36  fu.Asp.nid_11798_1-1798   42.48%    failed      3.63%
+  37  fu.Asp.ta_11799_1-1799    40.34%    failed      0.93%
+  38  fu.Neu.cra_11795_1-1795   38.21%    failed      0.05%
+  39  fu.Can.gla_11798_1-1798   38.11%    failed      0.00%
+  40  fu.Sac.cer_11798_1-1798   38.11%    failed      0.00%
+  41  fu.Bul.hui_11801_1-1801   40.31%    failed      0.00%
+  42  fu.Den.sul_11799_1-1799   39.55%    failed      0.00%
+  43  fu.Fel.oga_11794_1-1794   39.79%    failed      0.00%
+  44  fu.Gig.ar_11803_1-1803    39.83%    failed      0.00%
+  45  fl.Bac.spl_11520_1-1520   49.81%    passed     66.71%
+  46  fl.Cyt.ar_11526_1-1526    49.64%    passed     37.70%
+  47  fl.Fla.xan_11504_1-1504   50.09%    passed     10.69%
+  48  fl.ar.psy_11508_1-1508    51.05%    passed     35.79%
+  49  fl.Pre.eno_11521_1-1521   50.26%    passed     71.42%
+  50  fu.Fus.gon_11505_1-1457   50.43%    passed     49.85%
+  51  fu.Fus.nul_11507_1-1331   54.70%    passed      6.57%
+  52  fu.Lep.buc_11503_1-1468   49.88%    passed     27.38%
+  53  fu.Lep.ic_11506_1-1462    49.95%    failed      0.00%
+  54  gr.The.ros_11528_1-1528   47.61%    failed      0.00%
+  55  pt.Iso.pal_11511_1-1460   50.67%    failed      0.00%
+  56  pt.Pla.bra_11507_1-1150   60.41%    passed     20.67%
+  57  pt.Pla.ar_11527_1-1156    60.24%    passed     31.34%
+  58  ch.Zea.ay_11491_1-1491    48.67%    failed      2.13%
+  59  ch.Dau.car_11486_1-1484   48.92%    failed      1.04%
+  60  ch.Gly.ax_11471_1-1470    49.40%    failed      3.43%
+  61  ch.Pis.sat_11487_1-1487   48.81%    passed     12.40%
+  62  ch.Nic.tab_11486_1-1486   48.85%    failed      0.72%
+  63  ch.Pin.thu_11491_1-1491   48.67%    failed      0.42%
+  64  ch.Chl.ir_11629_1-1629    44.13%    passed     51.47%
+  65  ch.Eug.gra_11498_1-1496   48.50%    failed      0.00%
+  66  ch.Cya.par_11495_1-1495   48.54%    passed     83.35%
+  67  ch.Cya.cal_11492_1-1492   48.64%    failed      1.05%
+  68  ga.Esc.col_11542_1-1542   46.92%    passed     30.09%
+  69  ga.Hae.par_11535_1-1483   49.88%    passed     56.80%
+  70  ga.Leg.lyt_11531_1-1432   50.71%    passed     11.38%
+  71  ga.ar.psy_11537_1-1502    48.33%    passed     53.14%
+  72  ga.Oce.pus_11495_1-1447   50.50%    passed     87.48%
+  73  ga.Pho.pho_11533_1-1465   49.64%    passed     57.91%
+  74  ga.Pse.asp_11526_1-1491   48.74%    passed     49.59%
+  75  ga.Sal.typ_11536_1-1534   47.19%    passed     23.34%
+  76  ga.Vib.cho_11540_1-1538   47.13%    passed     41.00%
+  77  ga.Xan.pis_11537_1-1502   48.33%    passed     13.09%
+  78  ra.Dei.ur_11498_1-1472    49.33%    failed      0.05%
+  79  ra.Dei.rad_11502_1-1502   48.30%    passed     10.59%
+  80  sp.Bor.par_11526_1-1522   47.61%    failed      0.04%
+  81  sp.Lep.ey_11497_1-1418    51.26%    passed     70.41%
+  82  sp.Tre.soc_11527_1-1404   51.67%    failed      0.00%
+  83  sp.Tre.suc_11569_1-1510   48.92%    failed      0.00%
+  84  th.The.afr_11563_1-1403   52.60%    failed      0.00%
+  85  th.The.hyp_11538_1-1521   47.75%    failed      0.00%
+  86  th.The.sub_11545_1-1481   49.02%    failed      0.00%
+  87  ar.Sul.sol_11494_1-1493   48.61%    failed      0.00%
+  88  ar.The.pen_11511_1-1509   48.06%    failed      0.00%
+  89  ar.Hal.val_11471_1-1471   49.36%    failed      0.60%
+  90  ar.Hal.sac_11469_1-1469   49.43%    failed      0.00%
+  91  ar.Nat.ag_11466_1-1466    49.54%    failed      0.11%
+  92  ar.et.fer_11486_1-1481    49.02%    failed      0.00%
+  93  ar.et.jan_11476_1-1475    49.23%    failed      0.00%
+  94  ar.et.ore_11475_1-1421    51.53%    passed      7.03%
+  95  ar.The.chi_11494_1-1427   51.15%    failed      0.00%
+  96  ar.The.ste_11497_1-1463   49.64%    failed      0.00%
+  97  hi.Act.eur_11531_1-1410   51.53%    failed      0.02%
+  98  hi.Bif.inf_11523_1-1474   51.29%    failed      0.00%
+  99  hi.Cel.cel_11513_1-1453   49.98%    failed      0.03%
+ 100  hi.Cor.oti_11538_1-1461   49.91%    failed      0.01%
+ 101  hi.ic.par_11511_1-1414    51.33%    failed      0.00%
+ 102  hi.ic.ech_11505_1-1465    49.57%    failed      0.00%
+ 103  hi.yc.cel_11519_1-1460    49.78%    failed      0.00%
+ 104  hi.yc.int_11510_1-1441    50.40%    failed      0.01%
+ 105  hi.Noc.fla_11505_1-1470   49.40%    failed      0.05%
+ 106  hi.Str.ri_11529_1-1529    47.37%    failed      0.00%
+ 107  lo.Ach.lai_11501_1-1480   49.05%    failed      0.52%
+ 108  lo.Bac.alc_11537_1-1424   51.15%    passed     54.85%
+ 109  lo.Bac.sub_11550_1-1550   46.64%    passed     24.06%
+ 110  lo.Car.ob_11544_1-1385    54.01%    passed     71.38%
+ 111  lo.Eub.lac_11522_1-1401   52.05%    passed      9.42%
+ 112  lo.Lac.car_11551_1-1503   49.19%    passed     85.33%
+ 113  lo.yc.cap_11521_1-1521    47.64%    failed      0.32%
+ 114  lo.yc.yc_11513_1-1466     49.54%    failed      0.65%
+ 115  lo.Spi.cit_11530_1-1530   47.33%    failed      3.44%
+ 116  lo.Sta.ho_11546_1-1544    46.92%    passed     63.08%
+ 117  t.Sac.cer_11669_1-1669    42.55%    failed      0.00%
+ 118  t.Gly.ax_11990_1-1990     31.50%    passed     83.22%
+ 119  t.Zea.ay_11968_1-1968     32.25%    passed     34.80%
+ 120  t.Tet.pyr_11660_1-1660    42.86%    failed      0.00%
+ 121  al.Aci.cry_11481_1-1413   51.36%    failed      0.51%
+ 122  al.et.rho_11475_1-1407    51.57%    failed      0.43%
+ 123  al.Rhi.fre_11481_1-1481   49.12%    passed      9.19%
+ 124  al.Ric.pea_11489_1-1157   60.17%    passed     55.28%
+ 125  al.Sph.ter_11472_1-1417   51.22%    passed     66.57%
+ 126  be.Hyd.pal_11519_1-1480   49.05%    failed      3.63%
+ 127  be.Nei.fla_11534_1-1486   49.33%    passed     74.46%
+ 128  be.Pse.syz_11521_1-1445   50.26%    passed     22.73%
+ 129  be.Rho.pur_11534_1-1478   49.36%    passed      7.93%
+ 130  be.Tha.ter_11528_1-1484   48.92%    passed      5.87%
+ 131  de.Des.vib_11550_1-1516   47.85%    passed     72.19%
+ 132  de.Des.ter_11537_1-1506   48.85%    failed      0.21%
+ 133  de.Des.suc_11521_1-1435   50.64%    passed     35.71%
+ 134  ep.Alv.po_11504_1-1502    48.36%    passed      6.59%
+ 135  ep.Ca.fet_11509_1-1461    50.19%    failed      4.11%
+ 136  ep.Ca.lar_11507_1-1459    49.98%    passed     33.61%
+ 137  ep.Hel.pyl_11498_1-1450   50.29%    passed     43.56%
+ 138  ep.Hel.tro_11486_1-1422   51.05%    passed     67.49%
+ 139  un.Aer.ar_11550_1-1488    48.81%    failed      0.00%
+ 140  un.Fle.sin_11548_1-1500   49.29%    passed     16.98%
+ 141  un.ag.bav_11515_1-1513    47.92%    passed     12.07%
+WARNING: 33 sequences contain more than 50% gaps/ambiguity
+****  TOTAL                     46.33%  84 sequences failed composition chi2 test (p-value<5%; df=3)
+
+NOTE: Restoring information from model checkpoint file 16s_wstruct.aln.filter.fasta.model.gz
+
+CHECKPOINT: Initial tree restored
+NOTE: ModelFinder requires 104 MB RAM!
+ModelFinder will test 286 DNA models (sample size: 2905) ...
+ No. Model         -LnL         df  AIC          AICc         BIC
+  1  JC            102604.635   279 205767.271   205826.791   207434.069
+  2  JC+I          100835.582   280 202231.164   202291.133   203903.936
+  3  JC+G4         93224.885    280 187009.770   187069.740   188682.543
+  4  JC+I+G4       93177.720    281 186917.440   186977.861   188596.187
+  5  JC+R2         94851.042    281 190264.084   190324.505   191942.831
+  6  JC+R3         93527.681    283 187621.362   187682.691   189312.057
+  7  JC+R4         93167.990    285 186905.979   186968.225   188608.623
+  8  JC+R5         93068.403    287 186710.806   186773.974   188425.398
+  9  JC+R6         93034.814    289 186647.628   186711.727   188374.168
+ 10  JC+R7         93028.575    291 186639.150   186704.187   188377.638
+ 14  F81+F         102756.568   282 206077.136   206138.011   207761.858
+ 15  F81+F+I       100991.185   283 202548.369   202609.698   204239.064
+ 16  F81+F+G4      93437.383    283 187440.766   187502.095   189131.461
+ 17  F81+F+I+G4    93392.175    284 187352.350   187414.136   189049.019
+ 18  F81+F+R2      95063.111    284 190694.221   190756.008   192390.891
+ 19  F81+F+R3      93733.451    286 188038.901   188101.607   189747.519
+ 20  F81+F+R4      93385.819    288 187347.638   187411.271   189068.205
+ 21  F81+F+R5      93288.259    290 187156.519   187221.086   188889.033
+ 22  F81+F+R6      93252.553    292 187089.106   187154.615   188833.569
+ 23  F81+F+R7      93246.724    294 187081.448   187147.907   188837.859
+ 27  K2P           101391.763   280 203343.525   203403.495   205016.298
+ 28  K2P+I         99602.062    281 199766.124   199826.544   201444.871
+ 29  K2P+G4        91758.615    281 184079.230   184139.651   185757.977
+ 30  K2P+I+G4      91709.407    282 183982.813   184043.688   185667.535
+ 31  K2P+R2        93483.726    282 187531.453   187592.327   189216.174
+ 32  K2P+R3        92095.062    284 184758.124   184819.910   186454.793
+ 33  K2P+R4        91707.459    286 183986.917   184049.623   185695.535
+ 34  K2P+R5        91594.809    288 183765.618   183829.251   185486.184
+ 35  K2P+R6        91555.347    290 183690.694   183755.261   185423.208
+ 36  K2P+R7        91548.417    292 183680.834   183746.344   185425.297
+ 40  HKY+F         101618.368   283 203802.736   203864.066   205493.432
+ 41  HKY+F+I       99798.472    284 200164.945   200226.731   201861.614
+ 42  HKY+F+G4      91956.465    284 184480.930   184542.717   186177.600
+ 43  HKY+F+I+G4    91907.515    285 184385.029   184447.274   186087.673
+ 44  HKY+F+R2      93697.489    285 187964.977   188027.222   189667.621
+ 45  HKY+F+R3      92294.694    287 185163.388   185226.556   186877.980
+ 46  HKY+F+R4      91907.770    289 184393.539   184457.639   186120.080
+ 47  HKY+F+R5      91792.300    291 184166.600   184231.638   185905.089
+ 48  HKY+F+R6      91751.838    293 184089.676   184155.660   185840.114
+ 49  HKY+F+R7      91744.239    295 184078.478   184145.416   185840.864
+ 53  TNe           101232.752   281 203027.504   203087.925   204706.251
+ 54  TNe+I         99493.027    282 199550.055   199610.929   201234.776
+ 55  TNe+G4        91694.098    282 183952.196   184013.070   185636.917
+ 56  TNe+I+G4      91648.148    283 183862.297   183923.626   185552.992
+ 57  TNe+R2        93417.502    283 187401.004   187462.334   189091.700
+ 58  TNe+R3        92015.837    285 184601.673   184663.919   186304.317
+ 59  TNe+R4        91651.889    287 183877.777   183940.946   185592.369
+ 60  TNe+R5        91541.354    289 183660.708   183724.807   185387.248
+ 61  TNe+R6        91497.270    291 183576.539   183641.577   185315.028
+ 62  TNe+R7        91491.244    293 183568.489   183634.473   185318.926
+ 66  TN+F          101211.621   284 202991.242   203053.028   204687.911
+ 67  TN+F+I        99483.711    285 199537.422   199599.668   201240.066
+ 68  TN+F+G4       91715.634    285 184001.268   184063.513   185703.912
+ 69  TN+F+I+G4     91668.902    286 183909.804   183972.510   185618.422
+ 70  TN+F+R2       93447.470    286 187466.940   187529.645   189175.557
+ 71  TN+F+R3       92020.992    288 184617.984   184681.617   186338.550
+ 72  TN+F+R4       91677.616    290 183935.232   183999.800   185667.747
+ 73  TN+F+R5       91569.846    292 183723.693   183789.203   185468.156
+ 74  TN+F+R6       91523.904    294 183635.808   183702.267   185392.219
+ 75  TN+F+R7       91518.560    296 183629.120   183696.538   185397.480
+ 79  K3P           101386.233   281 203334.465   203394.886   205013.212
+ 80  K3P+I         99596.527    282 199757.055   199817.929   201441.776
+ 81  K3P+G4        91752.802    282 184069.603   184130.477   185754.324
+ 82  K3P+I+G4      91703.487    283 183972.975   184034.304   185663.670
+ 83  K3P+R2        93477.900    283 187521.800   187583.129   189212.495
+ 84  K3P+R3        92089.206    285 184748.412   184810.657   186451.056
+ 85  K3P+R4        91701.552    287 183977.103   184040.272   185691.695
+ 86  K3P+R5        91588.561    289 183755.122   183819.221   185481.662
+ 87  K3P+R6        91549.351    291 183680.702   183745.740   185419.191
+ 88  K3P+R7        91542.015    293 183670.029   183736.013   185420.466
+ 92  K3Pu+F        101612.899   284 203793.798   203855.584   205490.468
+ 93  K3Pu+F+I      99793.634    285 200157.269   200219.514   201859.913
+ 94  K3Pu+F+G4     91950.784    285 184471.568   184533.813   186174.212
+ 95  K3Pu+F+I+G4   91901.778    286 184375.556   184438.262   186084.174
+ 96  K3Pu+F+R2     93691.450    286 187954.899   188017.605   189663.517
+ 97  K3Pu+F+R3     92288.797    288 185153.593   185217.226   186874.160
+ 98  K3Pu+F+R4     91902.027    290 184384.054   184448.621   186116.568
+ 99  K3Pu+F+R5     91786.155    292 184156.309   184221.819   185900.772
+100  K3Pu+F+R6     91745.814    294 184079.629   184146.088   185836.040
+101  K3Pu+F+R7     91737.903    296 184067.806   184135.223   185836.166
+105  TPM2+F        101612.948   284 203793.897   203855.683   205490.567
+106  TPM2+F+I      99798.436    285 200166.872   200229.117   201869.516
+107  TPM2+F+G4     91956.432    285 184482.864   184545.109   186185.508
+108  TPM2+F+I+G4   91907.449    286 184386.898   184449.604   186095.516
+109  TPM2+F+R2     93697.488    286 187966.976   188029.682   189675.594
+110  TPM2+F+R3     92294.464    288 185164.928   185228.561   186885.494
+111  TPM2+F+R4     91907.733    290 184395.465   184460.033   186127.980
+112  TPM2+F+R5     91791.542    292 184167.083   184232.593   185911.546
+113  TPM2+F+R6     91751.279    294 184090.558   184157.018   185846.970
+114  TPM2+F+R7     91743.245    296 184078.490   184145.907   185846.850
+115  TPM2+F+R8     91743.204    298 184082.407   184150.789   185862.715
+118  TPM2u+F       101612.961   284 203793.923   203855.709   205490.593
+119  TPM2u+F+I     99798.434    285 200166.868   200229.113   201869.511
+120  TPM2u+F+G4    91956.430    285 184482.860   184545.106   186185.504
+121  TPM2u+F+I+G4  91907.447    286 184386.895   184449.600   186095.513
+122  TPM2u+F+R2    93697.486    286 187966.972   188029.678   189675.590
+123  TPM2u+F+R3    92294.462    288 185164.925   185228.558   186885.491
+124  TPM2u+F+R4    91907.745    290 184395.489   184460.057   186128.004
+125  TPM2u+F+R5    91791.541    292 184167.081   184232.591   185911.545
+126  TPM2u+F+R6    91751.278    294 184090.556   184157.016   185846.968
+127  TPM2u+F+R7    91743.216    296 184078.431   184145.848   185846.791
+128  TPM2u+F+R8    91743.178    298 184082.355   184150.738   185862.664
+131  TPM3+F        101566.514   284 203701.028   203762.815   205397.698
+132  TPM3+F+I      99730.612    285 200031.223   200093.469   201733.867
+133  TPM3+F+G4     91936.346    285 184442.693   184504.938   186145.337
+134  TPM3+F+I+G4   91887.493    286 184346.986   184409.692   186055.604
+135  TPM3+F+R2     93677.246    286 187926.493   187989.198   189635.111
+136  TPM3+F+R3     92273.214    288 185122.429   185186.062   186842.995
+137  TPM3+F+R4     91887.624    290 184355.248   184419.816   186087.763
+138  TPM3+F+R5     91776.096    292 184136.192   184201.702   185880.655
+139  TPM3+F+R6     91733.738    294 184055.476   184121.936   185811.888
+140  TPM3+F+R7     91725.719    296 184043.438   184110.856   185811.798
+141  TPM3+F+R8     91725.682    298 184047.363   184115.746   185827.672
+144  TPM3u+F       101566.516   284 203701.033   203762.819   205397.703
+145  TPM3u+F+I     99730.613    285 200031.225   200093.470   201733.869
+146  TPM3u+F+G4    91936.347    285 184442.694   184504.939   186145.337
+147  TPM3u+F+I+G4  91887.493    286 184346.987   184409.692   186055.605
+148  TPM3u+F+R2    93677.247    286 187926.494   187989.200   189635.112
+149  TPM3u+F+R3    92273.215    288 185122.431   185186.064   186842.997
+150  TPM3u+F+R4    91887.627    290 184355.255   184419.822   186087.769
+151  TPM3u+F+R5    91776.131    292 184136.261   184201.771   185880.724
+152  TPM3u+F+R6    91733.739    294 184055.478   184121.938   185811.889
+153  TPM3u+F+R7    91725.691    296 184043.382   184110.799   185811.742
+154  TPM3u+F+R8    91725.653    298 184047.307   184115.689   185827.615
+157  TIMe          101227.252   282 203018.503   203079.378   204703.225
+158  TIMe+I        99487.506    283 199541.013   199602.342   201231.708
+159  TIMe+G4       91688.115    283 183942.231   184003.560   185632.926
+160  TIMe+I+G4     91642.066    284 183852.131   183913.918   185548.801
+161  TIMe+R2       93411.695    284 187391.391   187453.177   189088.061
+162  TIMe+R3       92009.935    286 184591.870   184654.576   186300.488
+163  TIMe+R4       91645.853    288 183867.707   183931.340   185588.273
+164  TIMe+R5       91535.006    290 183650.012   183714.580   185382.527
+165  TIMe+R6       91491.138    292 183566.275   183631.785   185310.738
+166  TIMe+R7       91484.871    294 183557.742   183624.202   185314.154
+170  TIM+F         101206.100   285 202982.199   203044.444   204684.843
+171  TIM+F+I       99478.824    286 199529.648   199592.354   201238.266
+172  TIM+F+G4      91709.555    286 183991.109   184053.815   185699.727
+173  TIM+F+I+G4    91662.854    287 183899.709   183962.877   185614.301
+174  TIM+F+R2      93441.385    287 187456.770   187519.939   189171.362
+175  TIM+F+R3      92014.862    289 184607.725   184671.824   186334.265
+176  TIM+F+R4      91671.536    291 183925.072   183990.110   185663.561
+177  TIM+F+R5      91563.400    293 183712.800   183778.784   185463.237
+178  TIM+F+R6      91517.504    295 183625.008   183691.945   185387.393
+179  TIM+F+R7      91512.044    297 183618.088   183685.987   185392.422
+183  TIM2e         101203.125   282 202970.249   203031.124   204654.971
+184  TIM2e+I       99482.647    283 199531.295   199592.624   201221.990
+185  TIM2e+G4      91685.090    283 183936.180   183997.509   185626.875
+186  TIM2e+I+G4    91638.898    284 183845.796   183907.582   185542.466
+187  TIM2e+R2      93406.237    284 187380.474   187442.260   189077.143
+188  TIM2e+R3      92008.300    286 184588.600   184651.306   186297.218
+189  TIM2e+R4      91642.229    288 183860.459   183924.092   185581.025
+190  TIM2e+R5      91534.680    290 183649.360   183713.928   185381.875
+191  TIM2e+R6      91490.248    292 183564.496   183630.006   185308.959
+192  TIM2e+R7      91484.080    294 183556.160   183622.620   185312.571
+196  TIM2+F        101207.222   285 202984.443   203046.689   204687.087
+197  TIM2+F+I      99483.705    286 199539.411   199602.117   201248.029
+198  TIM2+F+G4     91715.360    286 184002.719   184065.425   185711.337
+199  TIM2+F+I+G4   91668.666    287 183911.333   183974.501   185625.925
+200  TIM2+F+R2     93447.432    287 187468.864   187532.033   189183.456
+201  TIM2+F+R3     92020.637    289 184619.274   184683.373   186345.814
+202  TIM2+F+R4     91677.387    291 183936.775   184001.813   185675.264
+203  TIM2+F+R5     91568.599    293 183723.199   183789.182   185473.636
+204  TIM2+F+R6     91523.041    295 183636.082   183703.020   185398.468
+205  TIM2+F+R7     91517.427    297 183628.855   183696.753   185403.189
+209  TIM3e         101185.630   282 202935.260   202996.134   204619.982
+210  TIM3e+I       99431.779    283 199429.558   199490.887   201120.253
+211  TIM3e+G4      91678.279    283 183922.559   183983.888   185613.254
+212  TIM3e+I+G4    91632.473    284 183832.946   183894.732   185529.615
+213  TIM3e+R2      93399.889    284 187367.777   187429.563   189064.447
+214  TIM3e+R3      91999.916    286 184571.832   184634.537   186280.449
+215  TIM3e+R4      91635.841    288 183847.683   183911.316   185568.249
+216  TIM3e+R5      91528.287    290 183636.574   183701.141   185369.088
+217  TIM3e+R6      91483.241    292 183550.482   183615.992   185294.945
+218  TIM3e+R7      91476.790    294 183541.580   183608.040   185297.992
+222  TIM3+F        101159.685   285 202889.371   202951.616   204592.014
+223  TIM3+F+I      99414.757    286 199401.514   199464.220   201110.132
+224  TIM3+F+G4     91699.013    286 183970.027   184032.733   185678.645
+225  TIM3+F+I+G4   91651.269    287 183876.538   183939.706   185591.130
+226  TIM3+F+R2     93426.636    287 187427.272   187490.441   189141.864
+227  TIM3+F+R3     92004.799    289 184587.599   184651.698   186314.139
+228  TIM3+F+R4     91659.703    291 183901.407   183966.444   185639.895
+229  TIM3+F+R5     91556.190    293 183698.380   183764.364   185448.817
+230  TIM3+F+R6     91509.011    295 183608.022   183674.960   185370.408
+231  TIM3+F+R7     91503.283    297 183600.566   183668.465   185374.900
+235  TVMe          101302.383   283 203170.766   203232.095   204861.461
+236  TVMe+I        99518.544    284 199605.088   199666.874   201301.757
+237  TVMe+G4       91721.441    284 184010.882   184072.668   185707.552
+238  TVMe+I+G4     91672.328    285 183914.656   183976.901   185617.299
+239  TVMe+R2       93444.010    285 187458.019   187520.264   189160.663
+240  TVMe+R3       92058.436    287 184690.873   184754.041   186405.465
+241  TVMe+R4       91669.868    289 183917.737   183981.836   185644.277
+242  TVMe+R5       91563.119    291 183708.239   183773.277   185446.728
+243  TVMe+R6       91522.466    293 183630.932   183696.916   185381.369
+244  TVMe+R7       91515.052    295 183620.104   183687.042   185382.490
+248  TVM+F         101549.947   286 203671.895   203734.601   205380.513
+249  TVM+F+I       99718.841    287 200011.683   200074.851   201726.275
+250  TVM+F+G4      91926.917    287 184427.835   184491.003   186142.427
+251  TVM+F+I+G4    91877.799    288 184331.598   184395.231   186052.165
+252  TVM+F+R2      93667.482    288 187910.963   187974.596   189631.530
+253  TVM+F+R3      92263.066    290 185106.133   185170.700   186838.647
+254  TVM+F+R4      91877.919    292 184339.838   184405.348   186084.302
+255  TVM+F+R5      91765.723    294 184119.446   184185.906   185875.858
+256  TVM+F+R6      91723.371    296 184038.741   184106.159   185807.101
+257  TVM+F+R7      91715.143    298 184026.286   184094.668   185806.594
+258  TVM+F+R8      91715.132    300 184030.265   184099.620   185822.521
+261  SYM           101145.103   284 202858.206   202919.993   204554.876
+262  SYM+I         99409.590    285 199389.181   199451.426   201091.825
+263  SYM+G4        91660.411    285 183890.821   183953.066   185593.465
+264  SYM+I+G4      91614.160    286 183800.319   183863.025   185508.937
+265  SYM+R2        93379.634    286 187331.268   187393.974   189039.886
+266  SYM+R3        91983.352    288 184542.703   184606.336   186263.270
+267  SYM+R4        91617.150    290 183814.299   183878.867   185546.814
+268  SYM+R5        91512.407    292 183608.814   183674.324   185353.277
+269  SYM+R6        91467.211    294 183522.421   183588.881   185278.833
+270  SYM+R7        91460.909    296 183513.818   183581.235   185282.178
+274  GTR+F         101144.024   287 202862.049   202925.217   204576.641
+275  GTR+F+I       99402.882    288 199381.765   199445.398   201102.331
+276  GTR+F+G4      91689.251    288 183954.502   184018.135   185675.068
+277  GTR+F+I+G4    91641.302    289 183860.603   183924.703   185587.144
+278  GTR+F+R2      93416.743    289 187411.487   187475.586   189138.027
+279  GTR+F+R3      91995.035    291 184572.069   184637.107   186310.558
+280  GTR+F+R4      91649.761    293 183885.523   183951.506   185635.960
+281  GTR+F+R5      91545.285    295 183680.571   183747.508   185442.956
+282  GTR+F+R6      91498.362    297 183590.725   183658.623   185365.059
+283  GTR+F+R7      91492.641    299 183583.283   183652.150   185369.565
+Akaike Information Criterion:           SYM+R7
+Corrected Akaike Information Criterion: SYM+R7
+Bayesian Information Criterion:         SYM+R6
+Best-fit model: SYM+R6 chosen according to BIC
+
+All model information printed to 16s_wstruct.aln.filter.fasta.model.gz
+CPU time for ModelFinder: 1816.172 seconds (0h:30m:16s)
+Wall-clock time for ModelFinder: 252.033 seconds (0h:4m:12s)
+
+NOTE: 62 MB RAM (0 GB) is required!
+Estimate model parameters (epsilon = 0.100)
+1. Initial log-likelihood: -95796.880
+2. Current log-likelihood: -91614.355
+3. Current log-likelihood: -91529.740
+4. Current log-likelihood: -91520.953
+5. Current log-likelihood: -91510.936
+6. Current log-likelihood: -91498.853
+7. Current log-likelihood: -91490.042
+8. Current log-likelihood: -91486.923
+9. Current log-likelihood: -91486.259
+10. Current log-likelihood: -91486.134
+Optimal log-likelihood: -91486.105
+Rate parameters:  A-C: 0.74855  A-G: 2.05245  A-T: 1.03081  C-G: 0.96258  C-T: 2.71991  G-T: 1.00000
+Base frequencies:  A: 0.250  C: 0.250  G: 0.250  T: 0.250
+Site proportion and rates:  (0.221,0.036) (0.189,0.193) (0.178,0.525) (0.152,1.091) (0.158,2.017) (0.103,3.686)
+Parameters optimization took 10 rounds (5.854 sec)
+Computing ML distances based on estimated model parameters... 0.628 sec
+Computing BIONJ tree...
+0.008 seconds
+Log-likelihood of BIONJ tree: -91717.736
+--------------------------------------------------------------------
+|             INITIALIZING CANDIDATE TREE SET                      |
+--------------------------------------------------------------------
+Generating 98 parsimony trees... 6.083 second
+Computing log-likelihood of 98 initial trees ... 5.416 seconds
+Current best score: -91467.804
+
+Do NNI search on 20 best initial trees
+Estimate model parameters (epsilon = 0.100)
+BETTER TREE FOUND at iteration 1: -91183.908
+Estimate model parameters (epsilon = 0.100)
+BETTER TREE FOUND at iteration 8: -91178.663
+Iteration 10 / LogL: -91229.215 / Time: 0h:4m:37s
+Estimate model parameters (epsilon = 0.100)
+BETTER TREE FOUND at iteration 11: -91160.994
+Iteration 20 / LogL: -91247.824 / Time: 0h:4m:44s
+Finish initializing candidate tree set (20)
+Current best tree score: -91160.994 / CPU time: 26.203
+Number of iterations: 20
+--------------------------------------------------------------------
+|               OPTIMIZING CANDIDATE TREE SET                      |
+--------------------------------------------------------------------
+Estimate model parameters (epsilon = 0.100)
+BETTER TREE FOUND at iteration 30: -91156.648
+Iteration 30 / LogL: -91156.648 / Time: 0h:4m:51s (0h:2m:16s left)
+Estimate model parameters (epsilon = 0.100)
+BETTER TREE FOUND at iteration 32: -91155.864
+Estimate model parameters (epsilon = 0.100)
+BETTER TREE FOUND at iteration 36: -91153.906
+Estimate model parameters (epsilon = 0.100)
+BETTER TREE FOUND at iteration 38: -91151.304
+Iteration 40 / LogL: -91154.402 / Time: 0h:4m:59s (0h:2m:0s left)
+Estimate model parameters (epsilon = 0.100)
+BETTER TREE FOUND at iteration 41: -91150.061
+Estimate model parameters (epsilon = 0.100)
+BETTER TREE FOUND at iteration 49: -91147.968
+Iteration 50 / LogL: -91157.150 / Time: 0h:5m:7s (0h:1m:52s left)
+Estimate model parameters (epsilon = 0.100)
+BETTER TREE FOUND at iteration 58: -91147.260
+Iteration 60 / LogL: -91148.725 / Time: 0h:5m:13s (0h:1m:42s left)
+Iteration 70 / LogL: -91164.134 / Time: 0h:5m:18s (0h:1m:25s left)
+Estimate model parameters (epsilon = 0.100)
+BETTER TREE FOUND at iteration 72: -91143.120
+Estimate model parameters (epsilon = 0.100)
+BETTER TREE FOUND at iteration 77: -91138.034
+Iteration 80 / LogL: -91146.705 / Time: 0h:5m:25s (0h:1m:30s left)
+Iteration 90 / LogL: -91141.035 / Time: 0h:5m:30s (0h:1m:16s left)
+Iteration 100 / LogL: -91145.160 / Time: 0h:5m:35s (0h:1m:5s left)
+Iteration 110 / LogL: -91151.907 / Time: 0h:5m:43s (0h:0m:56s left)
+Iteration 120 / LogL: -91141.392 / Time: 0h:5m:48s (0h:0m:46s left)
+Iteration 130 / LogL: -91158.033 / Time: 0h:5m:53s (0h:0m:36s left)
+Iteration 140 / LogL: -91143.268 / Time: 0h:5m:58s (0h:0m:28s left)
+Estimate model parameters (epsilon = 0.100)
+UPDATE BEST LOG-LIKELIHOOD: -91137.267
+Iteration 150 / LogL: -91139.645 / Time: 0h:6m:6s (0h:0m:20s left)
+Iteration 160 / LogL: -91145.639 / Time: 0h:6m:17s (0h:0m:13s left)
+Iteration 170 / LogL: -91143.311 / Time: 0h:6m:27s (0h:0m:5s left)
+TREE SEARCH COMPLETED AFTER 178 ITERATIONS / Time: 0h:6m:34s
+
+--------------------------------------------------------------------
+|                    FINALIZING TREE SEARCH                        |
+--------------------------------------------------------------------
+Performs final model parameters optimization
+Estimate model parameters (epsilon = 0.010)
+1. Initial log-likelihood: -91137.267
+Optimal log-likelihood: -91137.262
+Rate parameters:  A-C: 0.75127  A-G: 2.09893  A-T: 1.03217  C-G: 0.96943  C-T: 2.79207  G-T: 1.00000
+Base frequencies:  A: 0.250  C: 0.250  G: 0.250  T: 0.250
+Site proportion and rates:  (0.225,0.036) (0.191,0.193) (0.178,0.530) (0.149,1.102) (0.155,2.030) (0.102,3.736)
+Parameters optimization took 1 rounds (0.314 sec)
+BEST SCORE FOUND : -91137.262
+Total tree length: 37.072
+
+Total number of iterations: 178
+CPU time used for tree search: 971.881 sec (0h:16m:11s)
+Wall-clock time used for tree search: 135.973 sec (0h:2m:15s)
+Total CPU time used: 2839.076 sec (0h:47m:19s)
+Total wall-clock time used: 394.675 sec (0h:6m:34s)
+
+Analysis results written to: 
+  IQ-TREE report:                16s_wstruct.aln.filter.fasta.iqtree
+  Maximum-likelihood tree:       16s_wstruct.aln.filter.fasta.treefile
+  Likelihood distances:          16s_wstruct.aln.filter.fasta.mldist
+  Screen log file:               16s_wstruct.aln.filter.fasta.log
+
+Date and Time: Thu Feb 18 14:39:50 2021
