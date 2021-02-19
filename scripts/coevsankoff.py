@@ -4,13 +4,10 @@ import multiprocessing as mp
 import pandas as pd
 from Bio import SeqIO
 import pandas as pd
-from colour import Color
-import dill as pickle
 import time
 import h5py
 import dendropy
 from Bio import AlignIO , SeqIO , Seq
-from Bio.Alphabet import generic_dna
 
 from scipy import sparse
 import sparse as sparseND
@@ -37,12 +34,11 @@ runName = 'sparsemat_AAtransition'
 #number of cores to use
 NCORE = 20
 #fraction of genomes to remove if jackknifing
-bootstrap = .33
+bootstrap = .2
 #number of replicates
-bootstrap_replicates = 10
+bootstrap_replicates = 50
 restart = None
 nucleotides_only = True
-
 
 #keep track of transitions and not just events as binary
 transition_matrices = True
@@ -51,21 +47,19 @@ transition_matrices = True
 #treefile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
 #alnfile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
 
-treefile = '/home/cactuskid13/covid/validation_data/16s/16saln_clustalo.fasta.treefile'
-alnfile = '/home/cactuskid13/covid/validation_data/16s/16saln_clustalo_replaceU.fasta'
+treefile = '../validation_data/16s/16s_wstruct.aln.fasta.treefile'
+alnfile = '../validation_data/16s/16s_wstruct.aln.fasta'
 
 
 #use blast based annotation to assign codons to column ranges
-
-
 allowed_symbols = [ b'A', b'C', b'G' , b'T' ]
 allowed_transitions = [ c1+c2 for c1 in allowed_symbols for c2 in allowed_symbols  if c1!= c2]
-print(allowed_transitions)
+print('allowed transitions',allowed_transitions)
 
 transition_dict = {  c : i  for i,c in enumerate( allowed_transitions )  }
 rev_transition_dict= dict( zip(transition_dict.values(), transition_dict.keys()))
 allowed_symbols = set(allowed_symbols)
-print( transition_dict)
+print('transition dict', transition_dict)
 
 ProteinAlphabet = [ 'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y' ]
 allowed_AA_transitions = [ c1+c2 for c1 in ProteinAlphabet for c2 in ProteinAlphabet  if c1!= c2]
@@ -184,7 +178,7 @@ def process_node_smallpars_2(node , verbose = False):
                     else:
                         node.event[pos] = 1
                         node.eventype[pos] = transition_dict[node.parent_node.char[pos]+node.char[pos]]
-            node.AA = str(Seq.Seq(b''.join([ node.char[pos] for pos in [0,1,2] ]).decode(), generic_dna ).translate())
+            node.AA = str(Seq.Seq(b''.join([ node.char[pos] for pos in [0,1,2] ]).decode() ).translate())
 
             if node.AA != node.parent_node.AA and nucleotides_only == False:
                 node.AAevent = transitiondict_AA[node.parent_node.AA+node.AA]
@@ -200,7 +194,7 @@ def process_node_smallpars_2(node , verbose = False):
                 node.char[pos] = min(node.scores[pos], key=node.scores[pos].get)
                 node.event[pos] = 0
             if nucleotides_only == False:
-                node.AA = Seq.Seq(b''.join([ node.char[pos] for pos in [0,1,2] ]).decode(), generic_dna ).translate()
+                node.AA = Seq.Seq(b''.join([ node.char[pos] for pos in [0,1,2] ]).decode() ).translate()
             else:
                 node.AA = 'G'
         #down one level
@@ -347,7 +341,7 @@ def mat_creator(retq,matsize,iolock, runName, datasize , verbose = True , restar
                 if transition_matrices == True:
                     for transition in transiton_sparsemats:
                         print( 'saving ' , transition)
-                        with open( runName + str(transition)+ '_coevmat_transitionmatrices.pkl' , 'wb') as coevout:
+                        with open( runName + str(transition.decode())+ '_coevmat_transitionmatrices.pkl' , 'wb') as coevout:
                             transiton_sparsemats[transition].sum_duplicates()
                             coevout.write(pickle.dumps((count,transiton_sparsemats[transition])))
                     with open( runName + '_coevmat_AAmutations.pkl' , 'wb') as coevout:
@@ -372,7 +366,7 @@ def mat_creator(retq,matsize,iolock, runName, datasize , verbose = True , restar
                         coevout.write(pickle.dumps((count,AAmutation)))
                     for transition in transiton_sparsemats:
                         print( 'saving ' , transition)
-                        with open( runName +'_transition_' + str(transition)+ '_coevmat.pkl' , 'wb') as coevout:
+                        with open( runName +'_transition_' + str(transition.decode())+ '_coevmat.pkl' , 'wb') as coevout:
                             transiton_sparsemats[transition].sum_duplicates()
                             coevout.write(pickle.dumps((count,transiton_sparsemats[transition])))
                 else:
@@ -391,7 +385,7 @@ def mat_creator(retq,matsize,iolock, runName, datasize , verbose = True , restar
         if transition_matrices == True:
             for transition in transiton_sparsemats:
                 print( 'saving ' , transition)
-                with open( runName +'_transition_' + str(transition)+ '_coevmat.pkl' , 'wb') as coevout:
+                with open( runName +'_transition_' + str(transition.decode())+ '_coevmat.pkl' , 'wb') as coevout:
                     transiton_sparsemats[transition].sum_duplicates()
                     coevout.write(pickle.dumps((count,transiton_sparsemats[transition])))
         else:
