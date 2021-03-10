@@ -47,8 +47,9 @@ transition_matrices = True
 #treefile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
 #alnfile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
 
-treefile = '../validation_data/16s/16s_wstruct.aln.fasta.treefile'
-alnfile = '../validation_data/16s/16s_wstruct.aln.fasta'
+treefile = '../validation_data/16s/16s_salaminWstruct_aln.fasta.treefile'
+alnfile = '../validation_data/16s/16s_salaminWstruct_aln.fasta'
+
 
 
 #use blast based annotation to assign codons to column ranges
@@ -85,6 +86,7 @@ else:
         hf.create_dataset("MSA2array",  data=align_array)
     print('done')
 
+print('array shape' ,align_array.shape)
 
 if nucleotides_only == False:
     #use blast based annotation
@@ -92,7 +94,7 @@ if nucleotides_only == False:
 else:
     #just seperate sequence into dummy codons
     #indexing starts at 1 for blast
-    dummy_annot = {'dummy_gene': { 'qstart':1 , 'qend':align_array.shape[1] , 'evalue':0  }}
+    dummy_annot = {'dummy_gene': { 'qstart':1 , 'qend':align_array.shape[1]-1 , 'evalue':0  }}
     annotation = pd.DataFrame.from_dict( dummy_annot , orient = 'index')
 
 print('selecting informative sites')
