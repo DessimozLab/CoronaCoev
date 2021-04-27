@@ -8,26 +8,15 @@ import time
 import h5py
 import dendropy
 from Bio import AlignIO , SeqIO , Seq
-
 from scipy import sparse
 import sparse as sparseND
-
 import pickle
 import multiprocessing as mp
 import copy
-
 import sys
 import os
-
-
-
-
 import itertools
 
-
-
-
-print('mk8_AAprint')
 
 sys.setrecursionlimit( 10 **5 )
 runName = 'sparsemat_AAtransition'
@@ -38,8 +27,7 @@ bootstrap = .2
 #number of replicates
 bootstrap_replicates = 50
 restart = None
-nucleotides_only = True
-
+nucleotides_only = False
 #keep track of transitions and not just events as binary
 transition_matrices = True
 
@@ -47,8 +35,12 @@ transition_matrices = True
 #treefile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
 #alnfile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
 
-treefile = '../validation_data/16s/16s_salaminWstruct_aln.fasta.treefile'
-alnfile = '../validation_data/16s/16s_salaminWstruct_aln.fasta'
+#treefile = '../validation_data/16s/16s_salaminWstruct_aln.fasta.treefile'
+#alnfile = '../validation_data/16s/16s_salaminWstruct_aln.fasta'
+
+
+treefile = '../validation_data/dengue/dengue_all.aln.fasta.treefile'
+alnfile = '../validation_data/dengue/dengue_all.aln.fasta'
 
 
 
@@ -64,10 +56,10 @@ print('transition dict', transition_dict)
 
 ProteinAlphabet = [ 'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y' ]
 allowed_AA_transitions = [ c1+c2 for c1 in ProteinAlphabet for c2 in ProteinAlphabet  if c1!= c2]
-print(allowed_transitions[0:100] , '...etc...')
+print(allowed_AA_transitions[0:100] , '...etc...')
 
 transitiondict_AA = {  c : i  for i,c in enumerate( allowed_AA_transitions )  }
-rev_transitiondict_AA = dict( zip(transition_dict.values(), transition_dict.keys()))
+rev_transitiondict_AA = dict( zip(transitiondict_AA.values(), transitiondict_AA.keys()))
 
 tree = dendropy.Tree.get(
     path=treefile,
@@ -168,7 +160,7 @@ def process_node_smallpars_2(node , verbose = False):
             node.char = {}
             node.event = {}
             node.eventype= {}
-            node.AAevent = 0
+            node.AAevent = None
             for pos in [0,1,2]:
                 node.char[pos] = min(node.scores[pos], key=node.scores[pos].get)
                 if node.parent_node.char[pos] == node.char[pos]:
@@ -183,9 +175,10 @@ def process_node_smallpars_2(node , verbose = False):
             node.AA = str(Seq.Seq(b''.join([ node.char[pos] for pos in [0,1,2] ]).decode() ).translate())
 
             if node.AA != node.parent_node.AA and nucleotides_only == False:
-                node.AAevent = transitiondict_AA[node.parent_node.AA+node.AA]
-                if verbose == True:
-                    print( node.parent_node.AA , ' -> ' ,  node.AA)
+                if node.parent_node.AA+node.AA in transitiondict_AA:
+                    node.AAevent = transitiondict_AA[node.parent_node.AA+node.AA]
+                    if verbose == True:
+                        print( node.parent_node.AA , ' -> ' ,  node.AA)
         else:
             #root node
             node.char = {}
@@ -255,8 +248,8 @@ def calculate_small_parsimony( t, aln_columns , row_index , iolock, verbose  = F
         eventindex = [ n.matrow for n in t.nodes() if n.event[pos] > 0 ]
         eventtypes = [ n.eventype[pos] for n in t.nodes() if n.event[pos] > 0 ]
         eventdict[pos] = { 'type': eventtypes , 'index' : eventindex }
-    AAeventindex = [ n.matrow for n in t.nodes() if n.AAevent > 0 ]
-    AAeventypes = [ transition_dictAA[n.AAevent] for n in t.nodes() if n.AAevent > 0 ]
+    AAeventindex = [ n.matrow for n in t.nodes() if n.AAevent  ]
+    AAeventypes = [ n.AAevent for n in t.nodes() if n.AAevent  ]
     if verbose == True:
         with iolock:
             print('smallpars done')
@@ -314,7 +307,7 @@ def mat_creator(retq,matsize,iolock, runName, datasize , verbose = True , restar
         if r is None:
             break
         column,events = r
-        eventdict ,AAeventindex ,AAeventypes = events
+        eventdict , AAeventindex ,AAeventypes = events
         if verbose == True:
             print( eventdict, AAeventindex , AAeventypes )
         #save each position to event mats
@@ -364,7 +357,7 @@ def mat_creator(retq,matsize,iolock, runName, datasize , verbose = True , restar
                 print( time.time()- runtime )
                 if transition_matrices == True:
                     with open( runName + '_coevmat_AAmutations.pkl' , 'wb') as coevout:
-                        AAmutation.sum_duplicates()
+
                         coevout.write(pickle.dumps((count,AAmutation)))
                     for transition in transiton_sparsemats:
                         print( 'saving ' , transition)
@@ -373,7 +366,7 @@ def mat_creator(retq,matsize,iolock, runName, datasize , verbose = True , restar
                             coevout.write(pickle.dumps((count,transiton_sparsemats[transition])))
                 else:
                     with open( runName + '_coevmat_AAmutations.pkl' , 'wb') as coevout:
-                        AAmutation.sum_duplicates()
+
                         coevout.write(pickle.dumps((count,AAmutation)))
 
                     with open( runName + 'coevmat.pkl' , 'wb') as coevout:
