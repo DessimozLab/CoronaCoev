@@ -4,7 +4,7 @@
 from dask.distributed import Client
 
 if __name__ == '__main__':
-    client =Client(process=False)
+    client =Client()
 
     def inc(x):
         return x + 1
@@ -14,3 +14,5 @@ if __name__ == '__main__':
 
     a = client.submit(inc, 10)  # calls inc(10) in background thread or process
     b = client.submit(inc, 20)  # calls inc(20) in background thread or process
+    print(a.result())
+    
