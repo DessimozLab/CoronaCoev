@@ -50,79 +50,81 @@ alnfile = '../validation_data/16s/16s_wstruct.aln.fasta'
 from dask.distributed import Client
 
 
+if __name__ == '__main__':
 
-client = Client()
-#use blast based annotation to assign codons to column ranges
-allowed_symbols = [ b'A', b'C', b'G' , b'T' ]
-allowed_transitions = [ c1+c2 for c1 in allowed_symbols for c2 in allowed_symbols  if c1!= c2]
-print('allowed transitions',allowed_transitions)
 
-transition_dict = {  c : i  for i,c in enumerate( allowed_transitions )  }
-rev_transition_dict= dict( zip(transition_dict.values(), transition_dict.keys()))
-allowed_symbols = set(allowed_symbols)
-print('transition dict', transition_dict)
+    client = Client()
+    #use blast based annotation to assign codons to column ranges
+    allowed_symbols = [ b'A', b'C', b'G' , b'T' ]
+    allowed_transitions = [ c1+c2 for c1 in allowed_symbols for c2 in allowed_symbols  if c1!= c2]
+    print('allowed transitions',allowed_transitions)
 
-ProteinAlphabet = [ 'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y' ]
-allowed_AA_transitions = [ c1+c2 for c1 in ProteinAlphabet for c2 in ProteinAlphabet  if c1!= c2]
-print(allowed_AA_transitions[0:100] , '...etc...')
+    transition_dict = {  c : i  for i,c in enumerate( allowed_transitions )  }
+    rev_transition_dict= dict( zip(transition_dict.values(), transition_dict.keys()))
+    allowed_symbols = set(allowed_symbols)
+    print('transition dict', transition_dict)
 
-transitiondict_AA = {  c : i  for i,c in enumerate( allowed_AA_transitions )  }
-rev_transitiondict_AA = dict( zip(transitiondict_AA.values(), transitiondict_AA.keys()))
+    ProteinAlphabet = [ 'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y' ]
+    allowed_AA_transitions = [ c1+c2 for c1 in ProteinAlphabet for c2 in ProteinAlphabet  if c1!= c2]
+    print(allowed_AA_transitions[0:100] , '...etc...')
 
-tree = dendropy.Tree.get(
-    path=treefile,
-    schema='newick')
-msa = AlignIO.read(alnfile , format = 'fasta')
-if os.path.exists(alnfile +'.h5'):
-    with h5py.File(alnfile +'.h5', 'r') as hf:
-        align_array = hf['MSA2array'][:]
-        #implement w np unique could be faster
-else:
-    print('aln2numpy ')
-    align_array = np.array([ list(rec.upper())  for rec in msa], np.character)
+    transitiondict_AA = {  c : i  for i,c in enumerate( allowed_AA_transitions )  }
+    rev_transitiondict_AA = dict( zip(transitiondict_AA.values(), transitiondict_AA.keys()))
+
+    tree = dendropy.Tree.get(
+        path=treefile,
+        schema='newick')
+    msa = AlignIO.read(alnfile , format = 'fasta')
+    if os.path.exists(alnfile +'.h5'):
+        with h5py.File(alnfile +'.h5', 'r') as hf:
+            align_array = hf['MSA2array'][:]
+            #implement w np unique could be faster
+    else:
+        print('aln2numpy ')
+        align_array = np.array([ list(rec.upper())  for rec in msa], np.character)
+        print('done')
+        print('dumping to hdf5')
+        with h5py.File(alnfile +'.h5', 'w') as hf:
+            hf.create_dataset("MSA2array",  data=align_array)
+        print('done')
+
+    print('array shape' ,align_array.shape)
+
+    if nucleotides_only == False:
+        #use blast based annotation
+        annotation = pd.read_csv( alnfile +'annotation.csv' )
+    else:
+        #just seperate sequence into dummy codons
+        #indexing starts at 1 for blast
+        dummy_annot = {'dummy_gene': { 'qstart':1 , 'qend':align_array.shape[1]-1 , 'evalue':0  }}
+        annotation = pd.DataFrame.from_dict( dummy_annot , orient = 'index')
+
+
+
+
+
+
+
+    print('selecting informative sites')
+    #find all sites with mutations
+    def retcounts(index , col):
+        return index, np.unique(col.ravel() , return_counts=True)
+
+
+    a = client.submit( retcounts, 10, align_array[:,10] )
+    print(a.result())
+
+
+    colfutures =[]
+    for col in range(align_array.shape[1]):
+
+        colfutures.append( client.submit( retcounts, col, align_array[:,col] ) )
+    res = client.gather(colfutures)
+    sites= { col : dict(zip(list(unique[0]), list(unique[1]))) for col,unique in res }
+
+    informativesites = set([ s for s in sites if len( set( sites[s].keys()) -set([b'-',b'N']) ) > 1  ] )
+    print(len(informativesites))
     print('done')
-    print('dumping to hdf5')
-    with h5py.File(alnfile +'.h5', 'w') as hf:
-        hf.create_dataset("MSA2array",  data=align_array)
-    print('done')
-
-print('array shape' ,align_array.shape)
-
-if nucleotides_only == False:
-    #use blast based annotation
-    annotation = pd.read_csv( alnfile +'annotation.csv' )
-else:
-    #just seperate sequence into dummy codons
-    #indexing starts at 1 for blast
-    dummy_annot = {'dummy_gene': { 'qstart':1 , 'qend':align_array.shape[1]-1 , 'evalue':0  }}
-    annotation = pd.DataFrame.from_dict( dummy_annot , orient = 'index')
-
-
-
-
-
-
-
-print('selecting informative sites')
-#find all sites with mutations
-def retcounts(index , col):
-    return index, np.unique(col.ravel() , return_counts=True)
-
-
-a = client.submit( retcounts, 10, align_array[:,10] )
-print(a.result())
-
-
-colfutures =[]
-for col in range(align_array.shape[1]):
-
-    colfutures.append( client.submit( retcounts, col, align_array[:,col] ) )
-res = client.gather(colfutures)
-sites= { col : dict(zip(list(unique[0]), list(unique[1]))) for col,unique in res }
-
-informativesites = set([ s for s in sites if len( set( sites[s].keys()) -set([b'-',b'N']) ) > 1  ] )
-print(len(informativesites))
-print('done')
 
 
 
