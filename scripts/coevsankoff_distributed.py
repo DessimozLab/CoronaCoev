@@ -29,61 +29,52 @@ from dask.distributed import Client
 
 if __name__ == '__main__':
 
-        client = Client()
-        sys.setrecursionlimit( 10 **5 )
 
+    client = Client()
+    #use blast based annotation to assign codons to column ranges
+    allowed_symbols = [ b'A', b'C', b'G' , b'T' ]
+    allowed_transitions = [ c1+c2 for c1 in allowed_symbols for c2 in allowed_symbols  if c1!= c2]
+    print('allowed transitions',allowed_transitions)
 
-        runName = 'sparsemat_AAtransition'
-        #number of cores to use
-        Nodes = 20
-        #fraction of genomes to remove if jackknifing
-        bootstrap = .2
-        #number of replicates
-        bootstrap_replicates = 50
-        restart = None
-        nucleotides_only = True
-        #keep track of transitions and not just events as binary
-        transition_matrices = True
-        saveinterval = 3600
+    transition_dict = {  c : i  for i,c in enumerate( allowed_transitions )  }
+    rev_transition_dict= dict( zip(transition_dict.values(), transition_dict.keys()))
+    allowed_symbols = set(allowed_symbols)
+    print('transition dict', transition_dict)
 
-        #treefile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
-        #alnfile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
+    ProteinAlphabet = [ 'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y' ]
+    allowed_AA_transitions = [ c1+c2 for c1 in ProteinAlphabet for c2 in ProteinAlphabet  if c1!= c2]
+    print(allowed_AA_transitions[0:100] , '...etc...')
 
-        treefile = '../validation_data/16s/16s_wstruct.aln.fasta.treefile'
-        alnfile = '../validation_data/16s/16s_wstruct.aln.fasta'
+    transitiondict_AA = {  c : i  for i,c in enumerate( allowed_AA_transitions )  }
+    rev_transitiondict_AA = dict( zip(transitiondict_AA.values(), transitiondict_AA.keys()))
 
+    tree = dendropy.Tree.get(
+        path=treefile,
+        schema='newick')
+    msa = AlignIO.read(alnfile , format = 'fasta')
+    if os.path.exists(alnfile +'.h5'):
+        with h5py.File(alnfile +'.h5', 'r') as hf:
+            align_array = hf['MSA2array'][:]
+            #implement w np unique could be faster
+    else:
+        print('aln2numpy ')
+        align_array = np.array([ list(rec.upper())  for rec in msa], np.character)
+        print('done')
+        print('dumping to hdf5')
+        with h5py.File(alnfile +'.h5', 'w') as hf:
+            hf.create_dataset("MSA2array",  data=align_array)
+        print('done')
 
-        tree = dendropy.Tree.get(
-            path=treefile,
-            schema='newick')
-        msa = AlignIO.read(alnfile , format = 'fasta')
-        if os.path.exists(alnfile +'.h5'):
-            with h5py.File(alnfile +'.h5', 'r') as hf:
-                align_array = hf['MSA2array'][:]
-                #implement w np unique could be faster
-        else:
-            print('aln2numpy ')
-            align_array = np.array([ list(rec.upper())  for rec in msa], np.character)
-            print('done')
-            print('dumping to hdf5')
-            with h5py.File(alnfile +'.h5', 'w') as hf:
-                hf.create_dataset("MSA2array",  data=align_array)
-            print('done')
+    print('array shape' ,align_array.shape)
 
-        print('array shape' ,align_array.shape)
-        if nucleotides_only == False:
-            #use blast based annotation
-            annotation = pd.read_csv( alnfile +'annotation.csv' )
-        else:
-            #just seperate sequence into dummy codons
-            #indexing starts at 1 for blast
-            dummy_annot = {'dummy_gene': { 'qstart':1 , 'qend':align_array.shape[1]-1 , 'evalue':0  }}
-            annotation = pd.DataFrame.from_dict( dummy_annot , orient = 'index')
-        print(annotation)
-        #use blast based annotation to assign codons to column ranges
-        allowed_symbols = [ b'A', b'C', b'G' , b'T' ]
-        allowed_transitions = [ c1+c2 for c1 in allowed_symbols for c2 in allowed_symbols  if c1!= c2]
-        print('allowed transitions',allowed_transitions)
+    if nucleotides_only == False:
+        #use blast based annotation
+        annotation = pd.read_csv( alnfile +'annotation.csv' )
+    else:
+        #just seperate sequence into dummy codons
+        #indexing starts at 1 for blast
+        dummy_annot = {'dummy_gene': { 'qstart':1 , 'qend':align_array.shape[1]-1 , 'evalue':0  }}
+        annotation = pd.DataFrame.from_dict( dummy_annot , orient = 'index')
 
         transition_dict = {  c : i  for i,c in enumerate( allowed_transitions )  }
         rev_transition_dict= dict( zip(transition_dict.values(), transition_dict.keys()))
@@ -131,62 +122,47 @@ if __name__ == '__main__':
         IDindex = dict(zip( IDs.values() , IDs.keys() ) )
         print( [(t,IDindex[t]) for t in list(IDindex.keys())[0:10]] )
 
-        matsize = len(tree.nodes())
-        print('done')
-        print(matsize)
-        print('nodes/rows in coevolution matrix')
+
+    print('selecting informative sites')
+    #find all sites with mutations
+    def retcounts(index , col):
+        return index, np.unique(col.ravel() , return_counts=True)
 
 
-        ########### define small parsimony functions ############
-        def process_node_smallpars_1(node):
-            #go from leaves up and generate character sets
-            if node.symbols is None:
-                for child in node.child_nodes():
-                    if child.symbols is None:
-                        process_node_smallpars_1(child)
-                node.symbols = { }
-                node.scores = { }
-                for pos in [0,1,2]:
-                    symbols = set.intersection( * [ child.symbols[pos] for child in node.child_nodes( ) ] )
-                    if len(symbols) == 0:
-                        symbols = set.union( * [ child.symbols[pos] for child in node.child_nodes( ) ] )
-                    node.symbols[pos] = symbols
-                    node.scores[pos] = { }
-                    for c in allowed_symbols:
-                        if c not in node.symbols[pos]:
-                            #add trnasition mat here if needed
-                            score = min(  [ child.scores[pos][c] for child in node.child_nodes()])+1
-                        else:
-                            score = min(  [ child.scores[pos][c] for child in node.child_nodes() ] )
-                        node.scores[pos][c] = score
+    a = client.submit( retcounts, 10, align_array[:,10] )
+    print(a.result())
 
-        def process_node_smallpars_2(node , verbose = False):
-            #assign the most parsimonious char from children
-            if node.char is None:
-                if node.parent_node:
-                    #node has parent
-                    node.char = {}
-                    node.event = {}
-                    node.eventype= {}
-                    node.AAevent = None
-                    for pos in [0,1,2]:
-                        node.char[pos] = min(node.scores[pos], key=node.scores[pos].get)
-                        if node.parent_node.char[pos] == node.char[pos]:
-                            node.event[pos] = 0
-                        else:
-                            if node.scores[pos][node.parent_node.char[pos]] == node.scores[pos][node.char[pos]] :
-                                node.char[pos] = node.parent_node.char[pos]
-                                node.event[pos] = 0
-                            else:
-                                node.event[pos] = 1
-                                node.eventype[pos] = transition_dict[node.parent_node.char[pos]+node.char[pos]]
-                    node.AA = str(Seq.Seq(b''.join([ node.char[pos] for pos in [0,1,2] ]).decode() ).translate())
 
-                    if node.AA != node.parent_node.AA and nucleotides_only == False:
-                        if node.parent_node.AA+node.AA in transitiondict_AA:
-                            node.AAevent = transitiondict_AA[node.parent_node.AA+node.AA]
-                            if verbose == True:
-                                print( node.parent_node.AA , ' -> ' ,  node.AA)
+    colfutures =[]
+    for col in range(align_array.shape[1]):
+
+        colfutures.append( client.submit( retcounts, col, align_array[:,col] ) )
+    res = client.gather(colfutures)
+    sites= { col : dict(zip(list(unique[0]), list(unique[1]))) for col,unique in res }
+
+    informativesites = set([ s for s in sites if len( set( sites[s].keys()) -set([b'-',b'N']) ) > 1  ] )
+    print(len(informativesites))
+    print('done')
+
+
+
+
+
+
+
+
+
+
+#associate informative sites to a codon
+codon_dict = {}
+print( 'grouping codons')
+for i,r in annotation.iterrows():
+    #indexing starts at 1 for blast
+    for j,codon in enumerate(range(r.qstart-1, r.qend-1 , 3 )):
+        for nt in [codon,codon+ 1, codon+2]:
+            if nt in informativesites:
+                if (codon,codon+2) not in codon_dict:
+                    codon_dict[(codon,codon+2)] = (nt,)
                 else:
                     #root node
                     node.char = {}
