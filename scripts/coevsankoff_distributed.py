@@ -18,6 +18,8 @@ import os
 import itertools
 
 
+
+
 sys.setrecursionlimit( 10 **5 )
 runName = 'sparsemat_AAtransition'
 #number of cores to use
@@ -27,7 +29,7 @@ bootstrap = .2
 #number of replicates
 bootstrap_replicates = 50
 restart = None
-nucleotides_only = False
+nucleotides_only = True
 #keep track of transitions and not just events as binary
 transition_matrices = True
 
@@ -35,15 +37,21 @@ transition_matrices = True
 #treefile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
 #alnfile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
 
-#treefile = '../validation_data/16s/16s_salaminWstruct_aln.fasta.treefile'
-#alnfile = '../validation_data/16s/16s_salaminWstruct_aln.fasta'
+treefile = '../validation_data/16s/16s_wstruct.aln.fasta.treefile'
+alnfile = '../validation_data/16s/16s_wstruct.aln.fasta'
 
 
-treefile = '../validation_data/dengue/dengue_all.aln.fasta.treefile'
-alnfile = '../validation_data/dengue/dengue_all.aln.fasta'
+#treefile = '../validation_data/dengue/dengue_all.aln.fasta.treefile'
+#alnfile = '../validation_data/dengue/dengue_all.aln.fasta'
 
 
 
+
+from dask.distributed import Client
+
+
+
+client = Client()
 #use blast based annotation to assign codons to column ranges
 allowed_symbols = [ b'A', b'C', b'G' , b'T' ]
 allowed_transitions = [ c1+c2 for c1 in allowed_symbols for c2 in allowed_symbols  if c1!= c2]
@@ -89,18 +97,42 @@ else:
     dummy_annot = {'dummy_gene': { 'qstart':1 , 'qend':align_array.shape[1]-1 , 'evalue':0  }}
     annotation = pd.DataFrame.from_dict( dummy_annot , orient = 'index')
 
+
+
+
+
+
+
 print('selecting informative sites')
 #find all sites with mutations
-sites = {}
-#todo... paralellize this
+def retcounts(index , col):
+    return index, np.unique(col.ravel() , return_counts=True)
+
+
+a = client.submit( retcounts, 10, align_array[:,10] )
+print(a.result())
+
+
+colfutures =[]
 for col in range(align_array.shape[1]):
-    if col % 1000  == 0:
-        print(col)
-    (unique, counts) = np.unique(align_array[:,col].ravel() , return_counts=True)
-    sites.update({col:dict(zip(list(unique), list(counts)))})
+
+    colfutures.append( client.submit( retcounts, col, align_array[:,col] ) )
+res = client.gather(colfutures)
+sites= { col : dict(zip(list(unique[0]), list(unique[1]))) for col,unique in res }
+
 informativesites = set([ s for s in sites if len( set( sites[s].keys()) -set([b'-',b'N']) ) > 1  ] )
 print(len(informativesites))
 print('done')
+
+
+
+
+
+
+
+
+
+
 #associate informative sites to a codon
 codon_dict = {}
 print( 'grouping codons')
