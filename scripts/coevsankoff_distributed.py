@@ -29,6 +29,36 @@ from dask.distributed import Client
 
 if __name__ == '__main__':
 
+    sys.setrecursionlimit( 10 **5 )
+
+    runName = 'sparsemat_AAtransition'
+    #number of cores to use
+    NCORE = 20
+
+
+    #fraction of genomes to remove if jackknifing
+    bootstrap = .2
+    #number of replicates
+    bootstrap_replicates = 50
+    restart = None
+    nucleotides_only = False
+    #keep track of transitions and not just events as binary
+    transition_matrices = True
+
+    #treefile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
+    #alnfile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
+
+    treefile = '../validation_data/16s/16s_salaminWstruct_aln.fasta.treefile'
+    alnfile = '../validation_data/16s/16s_salaminWstruct_aln.fasta'
+
+
+    #treefile = '../validation_data/dengue/dengue_all.aln.fasta.treefile'
+    #alnfile = '../validation_data/dengue/dengue_all.aln.fasta'
+
+
+
+
+
 
     client = Client()
     #use blast based annotation to assign codons to column ranges
@@ -152,203 +182,273 @@ if __name__ == '__main__':
 
 
 
+    ####small parsimony functions ##########
 
-#associate informative sites to a codon
-codon_dict = {}
-print( 'grouping codons')
-for i,r in annotation.iterrows():
-    #indexing starts at 1 for blast
-    for j,codon in enumerate(range(r.qstart-1, r.qend-1 , 3 )):
-        for nt in [codon,codon+ 1, codon+2]:
-            if nt in informativesites:
-                if (codon,codon+2) not in codon_dict:
-                    codon_dict[(codon,codon+2)] = (nt,)
-                else:
-                    #root node
-                    node.char = {}
-                    node.event= {}
-                    node.eventype = {}
-                    node.AAevent = 0
-                    for pos in [0,1,2]:
-                        node.char[pos] = min(node.scores[pos], key=node.scores[pos].get)
-                        node.event[pos] = 0
-                    if nucleotides_only == False:
-                        node.AA = Seq.Seq(b''.join([ node.char[pos] for pos in [0,1,2] ]).decode() ).translate()
+
+
+    def process_node_smallpars_1(node):
+        #go from leaves up and generate character sets
+        if node.symbols is None:
+            for child in node.child_nodes():
+                if child.symbols is None:
+                    process_node_smallpars_1(child)
+            node.symbols = { }
+            node.scores = { }
+            for pos in [0,1,2]:
+                symbols = set.intersection( * [ child.symbols[pos] for child in node.child_nodes( ) ] )
+                if len(symbols) == 0:
+                    symbols = set.union( * [ child.symbols[pos] for child in node.child_nodes( ) ] )
+                node.symbols[pos] = symbols
+                node.scores[pos] = { }
+                for c in allowed_symbols:
+                    if c not in node.symbols[pos]:
+                        #add trnasition mat here if needed
+                        score = min(  [ child.scores[pos][c] for child in node.child_nodes()])+1
                     else:
-                        node.AA = 'G'
-                #down one level
-                for child in node.child_nodes():
-                    if child.char is None:
-                        process_node_smallpars_2(child)
+                        score = min(  [ child.scores[pos][c] for child in node.child_nodes() ] )
+                    node.scores[pos][c] = score
 
-        def calculate_small_parsimony( t , aln_columns , row_index , verbose  = False ):
-            missing = 0
-            #assign leaf values
-            for pos,col in enumerate(aln_columns):
-                for l in t.leaf_nodes():
-                    if hasattr(col , 'decode'):
-                        #column has no events
-                        l.calc[pos] = False
-                        char = col
-                        l.event[pos] = 0
-                        l.scores[pos] = { c:10**10 for c in allowed_symbols }
+    def process_node_smallpars_2(node , verbose = False):
+        #assign the most parsimonious char from children
+        if node.char is None:
+            if node.parent_node:
+                #node has parent
+                node.char = {}
+                node.event = {}
+                node.eventype= {}
+                node.AAevent = None
+                for pos in [0,1,2]:
+                    node.char[pos] = min(node.scores[pos], key=node.scores[pos].get)
+                    if node.parent_node.char[pos] == node.char[pos]:
+                        node.event[pos] = 0
+                    else:
+                        if node.scores[pos][node.parent_node.char[pos]] == node.scores[pos][node.char[pos]] :
+                            node.char[pos] = node.parent_node.char[pos]
+                            node.event[pos] = 0
+                        else:
+                            node.event[pos] = 1
+                            node.eventype[pos] = transition_dict[node.parent_node.char[pos]+node.char[pos]]
+                node.AA = str(Seq.Seq(b''.join([ node.char[pos] for pos in [0,1,2] ]).decode() ).translate())
+
+                if node.AA != node.parent_node.AA and nucleotides_only == False:
+                    if node.parent_node.AA+node.AA in transitiondict_AA:
+                        node.AAevent = transitiondict_AA[node.parent_node.AA+node.AA]
+                        if verbose == True:
+                            print( node.parent_node.AA , ' -> ' ,  node.AA)
+            else:
+                #root node
+                node.char = {}
+                node.event= {}
+                node.eventype = {}
+                node.AAevent = 0
+                for pos in [0,1,2]:
+                    node.char[pos] = min(node.scores[pos], key=node.scores[pos].get)
+                    node.event[pos] = 0
+                if nucleotides_only == False:
+                    node.AA = Seq.Seq(b''.join([ node.char[pos] for pos in [0,1,2] ]).decode() ).translate()
+                else:
+                    node.AA = 'G'
+            #down one level
+            for child in node.child_nodes():
+                if child.char is None:
+                    process_node_smallpars_2(child)
+
+
+    def calculate_small_parsimony(col,  tree , aln_columns , row_index , verbose  = False ):
+        missing = 0
+
+        #work on a fresh tree each time
+        t = copy.deepcopy(tree)
+        #assign leaf values
+        for pos,col in enumerate(aln_columns):
+            for l in t.leaf_nodes():
+                if hasattr(col , 'decode'):
+                    #column has no events
+                    l.calc[pos] = False
+                    char = col
+                    l.event[pos] = 0
+                    l.scores[pos] = { c:10**10 for c in allowed_symbols }
+                    if char.upper() in allowed_symbols:
+                        l.symbols[pos] = { char }
+                        l.scores[pos][char] = 0
+                    else:
+                        #ambiguous leaf
+                        l.symbols[pos] = allowed_symbols
+                else:
+                    #setup for small_pars1
+                    l.calc[pos] = True
+                    l.event[pos] =0
+                    l.scores[pos] = { c:10**10 for c in allowed_symbols }
+
+                    if str(l.taxon).replace("'", '') in row_index:
+
+                        char = col[ row_index[str(l.taxon).replace("'", '')]  ]
                         if char.upper() in allowed_symbols:
                             l.symbols[pos] = { char }
                             l.scores[pos][char] = 0
                         else:
                             #ambiguous leaf
-                            l.symbols[pos] = allowed_symbols
-                    else:
-                        #setup for small_pars1
-                        l.calc[pos] = True
-                        l.event[pos] =0
-                        l.scores[pos] = { c:10**10 for c in allowed_symbols }
-
-                        if str(l.taxon).replace("'", '') in row_index:
-
-                            char = col[ row_index[str(l.taxon).replace("'", '')]  ]
-                            if char.upper() in allowed_symbols:
-                                l.symbols[pos] = { char }
-                                l.scores[pos][char] = 0
-                            else:
-                                #ambiguous leaf
-                                l.symbols[pos] =  allowed_symbols
-                        else:
-                            missing += 1
-                            char = None
                             l.symbols[pos] =  allowed_symbols
+                    else:
+                        missing += 1
+                        char = None
+                        l.symbols[pos] =  allowed_symbols
 
-                            if verbose == True:
-                                with iolock:
-                                    print( 'err ! alncol: ', l.taxon , aln_column  )
-                        l.char[pos] = min(l.scores[pos], key=l.scores[pos].get)
+                        if verbose == True:
+                            with iolock:
+                                print( 'err ! alncol: ', l.taxon , aln_column  )
+                    l.char[pos] = min(l.scores[pos], key=l.scores[pos].get)
 
-            #up
-            process_node_smallpars_1(t.seed_node)
-            #down
-            process_node_smallpars_2(t.seed_node)
-            eventdict = {}
-            for pos in [0,1,2]:
-                eventindex = [ n.matrow for n in t.nodes() if n.event[pos] > 0 ]
-                eventtypes = [ n.eventype[pos] for n in t.nodes() if n.event[pos] > 0 ]
-                eventdict[pos] = { 'type': eventtypes , 'index' : eventindex }
-            AAeventindex = [ n.matrow for n in t.nodes() if n.AAevent  ]
-            AAeventypes = [ n.AAevent for n in t.nodes() if n.AAevent  ]
-            if verbose == True:
-                print('smallpars done')
-                print(eventdict)
-                print(AAeventindex)
-            return (eventdict , AAeventindex , AAeventypes)
-
+        #done tree init
+        #up
+        process_node_smallpars_1(t.seed_node)
+        #down
+        process_node_smallpars_2(t.seed_node)
+        #collect events
+        eventdict = {}
+        for pos in [0,1,2]:
+            eventindex = [ n.matrow for n in t.nodes() if n.event[pos] > 0 ]
+            eventtypes = [ n.eventype[pos] for n in t.nodes() if n.event[pos] > 0 ]
+            eventdict[pos] = { 'type': eventtypes , 'index' : eventindex }
+        AAeventindex = [ n.matrow for n in t.nodes() if n.AAevent  ]
+        AAeventypes = [ n.AAevent for n in t.nodes() if n.AAevent  ]
+        if verbose == True:
+            print('smallpars done')
+            print(eventdict)
+            print(AAeventindex)
+        return (col, eventdict , AAeventindex , AAeventypes)
 ######### start matsaver ##########
 
 
+def save_mats(count, runName, AA_mutation,nucleotide_mutation):
+    print('saving')
+    with open( runName + '_coevmat_AAmutations.pkl' , 'wb') as coevout:
+        coevout.write(pickle.dumps((count,AA_mutation)))
+    with open( runName + '_coevmat_nucleotidemutations.pkl' , 'wb') as coevout:
+        coevout.write(pickle.dumps((count,nucleotide_mutation)))
+    print('done saving')
 
-            for i,n in enumerate(tree.nodes()):
-                n.matrow = i
-                n.symbols = None
-                n.scores = None
-                n.event = None
-                n.char = None
-                n.eventype = None
-                n.AAevent = 0
+def collect_futures(  queue  , stopiter, runName  , check_interval= 1000, save_interval = 3600, nucleotides_only =False  ):
+    AA_mutation = None
+    nucleotide_mutation = None
 
-            for i,l in enumerate(tree.leaf_nodes()):
-                l.event = {}
-                l.scores = {}
-                l.symbols = {}
-                l.char= {}
-                l.calc = {}
+    t0 = time.time()
+    runtime = time.time()
+    count = 0
 
-            if restart == True:
-                with open(restart, 'rb') as pklin:
-                    count, transiton_sparsemats.loads(pklin.read())
-                    AAmutation,nucleotide_mutation = transiton_sparsemats
-            else:
-                count = 0
-                AAmutation = None
-                nucleotide_mutation = None
+    while stopiter == False:
+        #wait a little while
+        time.sleep( check_interval)
+        #grab batch
 
-            t0 = time.time()
-
-
-            #scale cluster
-
-
-
-            #scatter the blank tree and row index for each process
-            remote_tree = client.scatter(tree)
-            remote_index = client.scatter(row_index)
-            
-            #big for loop here generating the mats with futures
-            for n in range(replicates):
-                #select portion of random genomes to take out
-                if replicates >1:
-                    del_genomes = np.random.randint( align_array.shape[0], size= int(align_array.shape[0]*bootstrap) )
-                for annot_index,annot_row in annotation.iterrows():
-                    #indexing starts at 1 for blast
-                    for j,codon in enumerate(range(annot_row.qstart-1, annot_row.qend-1 , 3 )):
-                        positions = []
-                        for col in [codon, codon+1 , codon+2]:
-                            if col in informativesites:
-                                s1 = copy.deepcopy(align_array[:,col])
-                                #change characters of random genomes to N
-                                s1[del_genomes] = b'N'
-                                positions.append(s1)
-                            else:
-                                #just add the alignment character if it doesnt change.
-                                positions.append(   align_array[0,col] )
-
-                        #submit codons
-                        if ac == None:
-                            ac = as_completed([client.submit( )])
+        for future, result in as_completed( queue.get( timeout=None, batch=True) , with_results=True):
+                #get next job completed
+                column, eventdict , AAeventindex , AAeventypes= result
+                #save each position to event mats
+                for pos in [0,1,2]:
+                    col = column+pos
+                    eventindex = eventdict[pos]['index']
+                    eventtypes = eventdict[pos]['type']
+                    if len(eventindex)>0:
+                        if nucleotide_mutation:
+                            nucleotide_mutation  += sparseND.COO( coords =  ( eventindex  , np.ones(len(selectrows )) * col   , eventtypes ) , data = np.ones(len(eventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transition_dict) ),  dtype = np.int32   )
                         else:
-                            ac.add(c.submit( ))
-
-                        while len(ac) > futures_limit:
-
-                            #start collecting the futures
-
-                            remote_tree , codon , positions
-                            #once the
-
-
-
-                            def collect_futures()
-
-                            #save each position to event mats
-                            for pos in [0,1,2]:
-                                col = column+pos
-                                eventindex = eventdict[pos]['index']
-                                eventtypes = eventdict[pos]['type']
-                                if len(eventindex)>0:
-                                    if nucleotide_mutation:
-                                        nucleotide_mutation  += sparseND.COO( coords =  (eventindex , ( np.ones(len(eventindex))  , (selectrows , np.ones(len(selectrows )) * col )  , eventtypes ) , data = np.ones(len(eventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transition_dict) ),  dtype = np.int32   ) )
-                                    else:
-                                        nucleotide_mutation  =  sparseND.COO( coords =  (eventindex , ( np.ones(len(eventindex))  , (selectrows , np.ones(len(selectrows )) * col )  , eventtypes ) , data = np.ones(len(eventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transition_dict) ),  dtype = np.int32   ) )
-
-                            if nucleotides_only == False:
-                                if AAmutation:
-                                    AAmutation  += sparseND.COO( coords =  (AAeventindex , np.ones(len(AAeventindex)) * column , AAeventypes ) , data = np.ones(len(AAeventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transitiondict_AA ) ) ,  dtype = np.int32  )
-                                else:
-                                    AAmutation  = sparseND.COO( coords =  (AAeventindex , np.ones(len(AAeventindex)) * column , AAeventypes ) , data = np.ones(len(AAeventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transitiondict_AA ) )   ,  dtype = np.int32 )
-                            #check if we need to save
-                            if count%1000 == 0 and time.time()-t0 >= saveinterval:
-                                print('saving')
-                                print( time.time()- t0 )
-                                with open( runName + '_coevmat_AAmutations.pkl' , 'wb') as coevout:
-                                    AAmutation.sum_duplicates()
-                                    coevout.write(pickle.dumps((count,AAmutation)))
-                                with open( runName + 'coevmat.pkl' , 'wb') as coevout:
-                                    coevout.write(pickle.dumps((count,M1)))
-                                print('done saving')
+                            nucleotide_mutation  =  sparseND.COO( coords = ( eventindex ,  np.ones(len(selectrows )) * col   , eventtypes ) , data = np.ones(len(eventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transition_dict) ),  dtype = np.int32   )
+                if nucleotides_only == False:
+                    if AA_mutation:
+                        AA_mutation  += sparseND.COO( coords =  (AAeventindex , np.ones(len(AAeventindex)) * column , AAeventypes ) , data = np.ones(len(AAeventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transitiondict_AA ) ) ,  dtype = np.int32  )
+                    else:
+                        AA_mutation  = sparseND.COO( coords =  (AAeventindex , np.ones(len(AAeventindex)) * column , AAeventypes ) , data = np.ones(len(AAeventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transitiondict_AA ) )   ,  dtype = np.int32 )
+                count +=1
+        if time.time() - runtime > save_interval:
+            save_mats(count, runName, AA_mutation,nucleotide_mutation)
 
 
-                    print('FINAL SAVE !')
-                    print( time.time()- t0 )
-                    with open( runName + '_coevmat_AAmutations.pkl' , 'wb') as coevout:
-                        AAmutation.sum_duplicates()
-                        coevout.write(pickle.dumps((count,AAmutation)))
-                    with open( runName + 'coevmat_NTmutations.pkl' , 'wb') as coevout:
-                        coevout.write(pickle.dumps((count, nucleotide_mutation )))
-                    print('DONE ! ')
+
+    #finish up
+    for future, result in as_completed( queue.get( timeout=None, batch=True) , with_results=True):
+            #get next job completed
+            column, eventdict , AAeventindex , AAeventypes = result
+            #save each position to event mats
+            for pos in [0,1,2]:
+                col = column+pos
+                eventindex = eventdict[pos]['index']
+                eventtypes = eventdict[pos]['type']
+                if len(eventindex)>0:
+                    if nucleotide_mutation:
+                        nucleotide_mutation  += sparseND.COO( coords =  ( eventindex  , np.ones(len(selectrows )) * col   , eventtypes ) , data = np.ones(len(eventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transition_dict) ),  dtype = np.int32    )
+                    else:
+                        nucleotide_mutation  =  sparseND.COO( coords = ( eventindex ,  np.ones(len(selectrows )) * col   , eventtypes ) , data = np.ones(len(eventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transition_dict) ),  dtype = np.int32   )
+            if nucleotides_only == False:
+                if AA_mutation:
+                    AA_mutation  += sparseND.COO( coords =  (AAeventindex , np.ones(len(AAeventindex)) * column , AAeventypes ) , data = np.ones(len(AAeventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transitiondict_AA ) ) ,  dtype = np.int32  )
+                else:
+                    AA_mutation  = sparseND.COO( coords =  (AAeventindex , np.ones(len(AAeventindex)) * column , AAeventypes ) , data = np.ones(len(AAeventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transitiondict_AA ) )   ,  dtype = np.int32 )
+            count +=1
+
+    print('FINAL SAVE !')
+    save_mats(count, runName, AA_mutation,nucleotide_mutation)
+    print('DONE ! ')
+    return None
+
+
+
+    #######start the sankof algo here #######################
+
+    #init the blank tree
+    for i,n in enumerate(tree.nodes()):
+        n.matrow = i
+        n.symbols = None
+        n.scores = None
+        n.event = None
+        n.char = None
+        n.eventype = None
+        n.AAevent = 0
+
+    for i,l in enumerate(tree.leaf_nodes()):
+        l.event = {}
+        l.scores = {}
+        l.symbols = {}
+        l.char= {}
+        l.calc = {}
+    '''
+    rewrite this part to load intermediate result and skip to the same pt in calculations
+        if restart == True:
+            with open(restart, 'rb') as pklin:
+                count, transiton_sparsemats.loads(pklin.read())
+                AAmutation,nucleotide_mutation = transiton_sparsemats
+        else:
+            count = 0
+
+    '''
+    #scale cluster
+    #scatter the blank tree and row index for each process
+    remote_tree = client.scatter(tree)
+    remote_index = client.scatter(row_index)
+    queue = Queue()
+    saver_started = False
+    stopiter = Variable(False)
+    #big for loop here generating the mats with futures
+    for n in range(replicates):
+        #select portion of random genomes to take out
+        if replicates >1:
+            del_genomes = np.random.randint( align_array.shape[0], size= int(align_array.shape[0]*bootstrap) )
+        for annot_index,annot_row in annotation.iterrows():
+            #indexing starts at 1 for blast
+            for j,codon in enumerate(range(annot_row.qstart-1, annot_row.qend-1 , 3 )):
+                positions = []
+                for col in [codon, codon+1 , codon+2]:
+                    if col in informativesites:
+                        s1 = copy.deepcopy(align_array[:,col])
+                        #change characters of random genomes to N
+                        s1[del_genomes] = b'N'
+                        positions.append(s1)
+                    else:
+                        #just add the alignment character if it doesnt change.
+                        positions.append(   align_array[0,col] )
+                #submit codons
+                queue.put( c.submit( client.submit(  calculate_small_parsimony,  col=codon,tree=remote_tree , aln_columns=positions , row_index=remote_index , verbose  = False )  ) )
+                if saver_started or queue.qsize() > future_clean_trigger:
+                    client.submit(  collect_futures, queue= queue , stopiter=stopiter , runName= runName , nucleotides_only =False  )
+                    saver_started = True
+    stopiter.set(True)

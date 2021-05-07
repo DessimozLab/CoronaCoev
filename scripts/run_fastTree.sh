@@ -2,7 +2,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=30
-#SBATCH --mem=200G
+#SBATCH --mem=300G
 #SBATCH --time=24:00:00
 #SBATCH --job-name=fast-tree
 
