@@ -17,23 +17,20 @@ import os
 import itertools
 
 
+from dask.distributed import Client, Variable , Queue
+from dask.distributed import  utils_perf
+import gc
 
-
-#treefile = '../validation_data/dengue/dengue_all.aln.fasta.treefile'
-#alnfile = '../validation_data/dengue/dengue_all.aln.fasta'
-
-
-
-from dask.distributed import Client
-
+throttled = utils_perf.ThrottledGC()
+gc.collect = throttled.collect
 
 if __name__ == '__main__':
 
-    sys.setrecursionlimit( 10 **5 )
+    sys.setrecursionlimit( 10 **8 )
 
     runName = 'sparsemat_AAtransition'
     #number of cores to use
-    NCORE = 20
+    NCORE = 50
 
 
     #fraction of genomes to remove if jackknifing
@@ -41,24 +38,20 @@ if __name__ == '__main__':
     #number of replicates
     bootstrap_replicates = 50
     restart = None
-    nucleotides_only = False
+    nucleotides_only = True
     #keep track of transitions and not just events as binary
     transition_matrices = True
+    future_clean_trigger = 1000
 
-    #treefile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
-    #alnfile = '/home/cactuskid13/covid/lucy_mk3/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
+    treefile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
+    alnfile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
 
-    treefile = '../validation_data/16s/16s_salaminWstruct_aln.fasta.treefile'
-    alnfile = '../validation_data/16s/16s_salaminWstruct_aln.fasta'
+    #treefile = '../validation_data/16s/16s_salaminWstruct_aln.fasta.treefile'
+    #alnfile = '../validation_data/16s/16s_salaminWstruct_aln.fasta'
 
 
     #treefile = '../validation_data/dengue/dengue_all.aln.fasta.treefile'
     #alnfile = '../validation_data/dengue/dengue_all.aln.fasta'
-
-
-
-
-
 
     client = Client()
     #use blast based annotation to assign codons to column ranges
@@ -106,86 +99,69 @@ if __name__ == '__main__':
         dummy_annot = {'dummy_gene': { 'qstart':1 , 'qend':align_array.shape[1]-1 , 'evalue':0  }}
         annotation = pd.DataFrame.from_dict( dummy_annot , orient = 'index')
 
-        transition_dict = {  c : i  for i,c in enumerate( allowed_transitions )  }
-        rev_transition_dict= dict( zip(transition_dict.values(), transition_dict.keys()))
-        allowed_symbols = set(allowed_symbols)
-        print('transition dict', transition_dict)
+    transition_dict = {  c : i  for i,c in enumerate( allowed_transitions )  }
+    rev_transition_dict= dict( zip(transition_dict.values(), transition_dict.keys()))
+    allowed_symbols = set(allowed_symbols)
+    print('transition dict', transition_dict)
 
-        ProteinAlphabet = [ 'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y' ]
-        allowed_AA_transitions = [ c1+c2 for c1 in ProteinAlphabet for c2 in ProteinAlphabet  if c1!= c2]
-        print(allowed_AA_transitions[0:100] , '...etc...')
-        transitiondict_AA = {  c : i  for i,c in enumerate( allowed_AA_transitions )  }
-        rev_transitiondict_AA = dict( zip(transitiondict_AA.values(), transitiondict_AA.keys()))
+    ProteinAlphabet = [ 'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y' ]
+    allowed_AA_transitions = [ c1+c2 for c1 in ProteinAlphabet for c2 in ProteinAlphabet  if c1!= c2]
+    print(allowed_AA_transitions[0:100] , '...etc...')
+    transitiondict_AA = {  c : i  for i,c in enumerate( allowed_AA_transitions )  }
+    rev_transitiondict_AA = dict( zip(transitiondict_AA.values(), transitiondict_AA.keys()))
 
-        print('selecting informative sites')
-        def retcounts(index , col):
-            return index, np.unique(col.ravel() , return_counts=True)
-        colfutures =[]
-        for col in range(align_array.shape[1]):
-            colfutures.append( client.submit( retcounts, col, align_array[:,col] ) )
-        res = client.gather(colfutures)
-        sites= { col : dict(zip(list(unique[0]), list(unique[1]))) for col,unique in res }
-        informativesites = set([ s for s in sites if len( set( sites[s].keys()) -set([b'-',b'N']) ) > 1  ] )
-        print('done')
-        print('informative columns:' , len(informativesites))
+    print('selecting informative sites')
+    def retcounts(index , col):
+        return index, np.unique(col.ravel() , return_counts=True)
+    colfutures =[]
+    for col in range(align_array.shape[1]):
+        colfutures.append( client.submit( retcounts, col, align_array[:,col] ) )
+    res = client.gather(colfutures)
+    sites= { col : dict(zip(list(unique[0]), list(unique[1]))) for col,unique in res }
+    informativesites = set([ s for s in sites if len( set( sites[s].keys()) -set([b'-',b'N']) ) > 1  ] )
+    print('done')
+    print('informative columns:' , len(informativesites))
 
-        #associate informative sites to a codon
-        codon_dict = {}
-        print( 'grouping codons')
-        for i,r in annotation.iterrows():
-            #indexing starts at 1 for blast
-            for j,codon in enumerate(range(r.qstart-1, r.qend-1 , 3 )):
-                for nt in [codon,codon+ 1, codon+2]:
-                    if nt in informativesites:
-                        if (codon,codon+2) not in codon_dict:
-                            codon_dict[(codon,codon+2)] = (nt,)
-                        else:
-                            codon_dict[(codon,codon+2)]+= (nt,)
-        print('done')
-        codon_dict_rev = dict(zip ( codon_dict.values() , codon_dict.keys( ) ) )
-        def clipID(ID):
-            return ID.replace('|',' ').replace('_',' ').replace('/',' ').strip()
+    #associate informative sites to a codon
+    codon_dict = {}
+    print( 'grouping codons')
+    for i,r in annotation.iterrows():
+        #indexing starts at 1 for blast
+        for j,codon in enumerate(range(r.qstart-1, r.qend-1 , 3 )):
+            for nt in [codon,codon+ 1, codon+2]:
+                if nt in informativesites:
+                    if (codon,codon+2) not in codon_dict:
+                        codon_dict[(codon,codon+2)] = (nt,)
+                    else:
+                        codon_dict[(codon,codon+2)]+= (nt,)
+    print('done')
+    codon_dict_rev = dict(zip ( codon_dict.values() , codon_dict.keys( ) ) )
+    def clipID(ID):
+        return ID.replace('|',' ').replace('_',' ').replace('/',' ').strip()
 
-        print('preparing tree IDs')
-        IDs = {i:clipID(rec.id) for i,rec in enumerate(msa)}
-        #IDs = {i:rec.id for i,rec in enumerate(msa)}
-        IDindex = dict(zip( IDs.values() , IDs.keys() ) )
-        print( [(t,IDindex[t]) for t in list(IDindex.keys())[0:10]] )
+    print('preparing tree IDs')
+    IDs = {i:clipID(rec.id) for i,rec in enumerate(msa)}
+    #IDs = {i:rec.id for i,rec in enumerate(msa)}
+    IDindex = dict(zip( IDs.values() , IDs.keys() ) )
+    print( [(t,IDindex[t]) for t in list(IDindex.keys())[0:10]] )
 
 
     print('selecting informative sites')
     #find all sites with mutations
     def retcounts(index , col):
         return index, np.unique(col.ravel() , return_counts=True)
-
-
     a = client.submit( retcounts, 10, align_array[:,10] )
     print(a.result())
-
-
     colfutures =[]
     for col in range(align_array.shape[1]):
-
         colfutures.append( client.submit( retcounts, col, align_array[:,col] ) )
     res = client.gather(colfutures)
     sites= { col : dict(zip(list(unique[0]), list(unique[1]))) for col,unique in res }
-
     informativesites = set([ s for s in sites if len( set( sites[s].keys()) -set([b'-',b'N']) ) > 1  ] )
     print(len(informativesites))
     print('done')
 
-
-
-
-
-
-
-
-
     ####small parsimony functions ##########
-
-
-
     def process_node_smallpars_1(node):
         #go from leaves up and generate character sets
         if node.symbols is None:
@@ -317,33 +293,61 @@ if __name__ == '__main__':
             print(eventdict)
             print(AAeventindex)
         return (col, eventdict , AAeventindex , AAeventypes)
-######### start matsaver ##########
 
 
-def save_mats(count, runName, AA_mutation,nucleotide_mutation):
-    print('saving')
-    with open( runName + '_coevmat_AAmutations.pkl' , 'wb') as coevout:
-        coevout.write(pickle.dumps((count,AA_mutation)))
-    with open( runName + '_coevmat_nucleotidemutations.pkl' , 'wb') as coevout:
-        coevout.write(pickle.dumps((count,nucleotide_mutation)))
-    print('done saving')
+    def save_mats(count, runName, AA_mutation,nucleotide_mutation):
+        print('saving')
+        with open( runName + '_coevmat_AAmutations.pkl' , 'wb') as coevout:
+            coevout.write(pickle.dumps((count,AA_mutation)))
+        with open( runName + '_coevmat_nucleotidemutations.pkl' , 'wb') as coevout:
+            coevout.write(pickle.dumps((count,nucleotide_mutation)))
+        print('done saving')
 
-def collect_futures(  queue  , stopiter, runName  , check_interval= 1000, save_interval = 3600, nucleotides_only =False  ):
-    AA_mutation = None
-    nucleotide_mutation = None
 
-    t0 = time.time()
-    runtime = time.time()
-    count = 0
+    def collect_futures(  queue  , stopiter  , runName  , check_interval= 10 , save_interval = 60, nucleotides_only =False  ):
+        AA_mutation = None
+        nucleotide_mutation = None
 
-    while stopiter == False:
-        #wait a little while
-        time.sleep( check_interval)
-        #grab batch
+        t0 = time.time()
+        runtime = time.time()
+        count = 0
 
+        while stopiter == False:
+
+            #wait a little while
+            time.sleep( check_interval)
+            for future, result in as_completed( queue.get( timeout=None, batch=True) , with_results=True):
+                    #get next job completed
+                    column, eventdict , AAeventindex , AAeventypes= result
+                    #save each position to event mats
+                    for pos in [0,1,2]:
+                        col = column+pos
+                        eventindex = eventdict[pos]['index']
+                        eventtypes = eventdict[pos]['type']
+                        if len(eventindex)>0:
+                            if nucleotide_mutation:
+                                nucleotide_mutation  += sparseND.COO( coords =  ( eventindex  , np.ones(len(selectrows )) * col   , eventtypes ) , data = np.ones(len(eventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transition_dict) ),  dtype = np.int32   )
+                            else:
+                                nucleotide_mutation  =  sparseND.COO( coords = ( eventindex ,  np.ones(len(selectrows )) * col   , eventtypes ) , data = np.ones(len(eventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transition_dict) ),  dtype = np.int32   )
+                    if nucleotides_only == False:
+                        if AA_mutation:
+                            AA_mutation  += sparseND.COO( coords =  (AAeventindex , np.ones(len(AAeventindex)) * column , AAeventypes ) , data = np.ones(len(AAeventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transitiondict_AA ) ) ,  dtype = np.int32  )
+                        else:
+                            AA_mutation  = sparseND.COO( coords =  (AAeventindex , np.ones(len(AAeventindex)) * column , AAeventypes ) , data = np.ones(len(AAeventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transitiondict_AA ) )   ,  dtype = np.int32 )
+                    count +=1
+            if time.time() - runtime > save_interval:
+
+
+                print('saving', time.time()-t0)
+                runtime = time.time()
+                save_mats(count, runName, AA_mutation,nucleotide_mutation)
+
+
+
+        #finish up
         for future, result in as_completed( queue.get( timeout=None, batch=True) , with_results=True):
                 #get next job completed
-                column, eventdict , AAeventindex , AAeventypes= result
+                column, eventdict , AAeventindex , AAeventypes = result
                 #save each position to event mats
                 for pos in [0,1,2]:
                     col = column+pos
@@ -351,7 +355,7 @@ def collect_futures(  queue  , stopiter, runName  , check_interval= 1000, save_i
                     eventtypes = eventdict[pos]['type']
                     if len(eventindex)>0:
                         if nucleotide_mutation:
-                            nucleotide_mutation  += sparseND.COO( coords =  ( eventindex  , np.ones(len(selectrows )) * col   , eventtypes ) , data = np.ones(len(eventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transition_dict) ),  dtype = np.int32   )
+                            nucleotide_mutation  += sparseND.COO( coords =  ( eventindex  , np.ones(len(selectrows )) * col   , eventtypes ) , data = np.ones(len(eventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transition_dict) ),  dtype = np.int32    )
                         else:
                             nucleotide_mutation  =  sparseND.COO( coords = ( eventindex ,  np.ones(len(selectrows )) * col   , eventtypes ) , data = np.ones(len(eventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transition_dict) ),  dtype = np.int32   )
                 if nucleotides_only == False:
@@ -360,36 +364,11 @@ def collect_futures(  queue  , stopiter, runName  , check_interval= 1000, save_i
                     else:
                         AA_mutation  = sparseND.COO( coords =  (AAeventindex , np.ones(len(AAeventindex)) * column , AAeventypes ) , data = np.ones(len(AAeventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transitiondict_AA ) )   ,  dtype = np.int32 )
                 count +=1
-        if time.time() - runtime > save_interval:
-            save_mats(count, runName, AA_mutation,nucleotide_mutation)
 
-
-
-    #finish up
-    for future, result in as_completed( queue.get( timeout=None, batch=True) , with_results=True):
-            #get next job completed
-            column, eventdict , AAeventindex , AAeventypes = result
-            #save each position to event mats
-            for pos in [0,1,2]:
-                col = column+pos
-                eventindex = eventdict[pos]['index']
-                eventtypes = eventdict[pos]['type']
-                if len(eventindex)>0:
-                    if nucleotide_mutation:
-                        nucleotide_mutation  += sparseND.COO( coords =  ( eventindex  , np.ones(len(selectrows )) * col   , eventtypes ) , data = np.ones(len(eventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transition_dict) ),  dtype = np.int32    )
-                    else:
-                        nucleotide_mutation  =  sparseND.COO( coords = ( eventindex ,  np.ones(len(selectrows )) * col   , eventtypes ) , data = np.ones(len(eventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transition_dict) ),  dtype = np.int32   )
-            if nucleotides_only == False:
-                if AA_mutation:
-                    AA_mutation  += sparseND.COO( coords =  (AAeventindex , np.ones(len(AAeventindex)) * column , AAeventypes ) , data = np.ones(len(AAeventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transitiondict_AA ) ) ,  dtype = np.int32  )
-                else:
-                    AA_mutation  = sparseND.COO( coords =  (AAeventindex , np.ones(len(AAeventindex)) * column , AAeventypes ) , data = np.ones(len(AAeventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transitiondict_AA ) )   ,  dtype = np.int32 )
-            count +=1
-
-    print('FINAL SAVE !')
-    save_mats(count, runName, AA_mutation,nucleotide_mutation)
-    print('DONE ! ')
-    return None
+        print('FINAL SAVE !')
+        save_mats(count, runName, AA_mutation,nucleotide_mutation)
+        print('DONE ! ')
+        return None
 
 
 
@@ -421,17 +400,20 @@ def collect_futures(  queue  , stopiter, runName  , check_interval= 1000, save_i
             count = 0
 
     '''
+
+
+    print('starting sankof')
     #scale cluster
     #scatter the blank tree and row index for each process
     remote_tree = client.scatter(tree)
-    remote_index = client.scatter(row_index)
+    remote_index = client.scatter(IDindex)
     queue = Queue()
     saver_started = False
     stopiter = Variable(False)
     #big for loop here generating the mats with futures
-    for n in range(replicates):
+    for n in range(bootstrap_replicates):
         #select portion of random genomes to take out
-        if replicates >1:
+        if bootstrap_replicates >1:
             del_genomes = np.random.randint( align_array.shape[0], size= int(align_array.shape[0]*bootstrap) )
         for annot_index,annot_row in annotation.iterrows():
             #indexing starts at 1 for blast
@@ -441,14 +423,17 @@ def collect_futures(  queue  , stopiter, runName  , check_interval= 1000, save_i
                     if col in informativesites:
                         s1 = copy.deepcopy(align_array[:,col])
                         #change characters of random genomes to N
-                        s1[del_genomes] = b'N'
+                        if bootstrap_replicates >1:
+                            s1[del_genomes] = b'N'
                         positions.append(s1)
                     else:
                         #just add the alignment character if it doesnt change.
                         positions.append(   align_array[0,col] )
                 #submit codons
-                queue.put( c.submit( client.submit(  calculate_small_parsimony,  col=codon,tree=remote_tree , aln_columns=positions , row_index=remote_index , verbose  = False )  ) )
-                if saver_started or queue.qsize() > future_clean_trigger:
-                    client.submit(  collect_futures, queue= queue , stopiter=stopiter , runName= runName , nucleotides_only =False  )
+                queue.put( client.submit(  calculate_small_parsimony,  col=codon,tree=remote_tree , aln_columns=positions , row_index=remote_index , verbose  = False )  )
+                if saver_started == False and  queue.qsize() > future_clean_trigger:
+                    print('starting saver')
+                    client.submit(  collect_futures , queue= queue , stopiter=stopiter , runName= runName , nucleotides_only =False  )
                     saver_started = True
     stopiter.set(True)
+    print('done iterating')

@@ -27,7 +27,7 @@ bootstrap = .2
 #number of replicates
 bootstrap_replicates = 50
 restart = None
-nucleotides_only = False
+nucleotides_only = True
 #keep track of transitions and not just events as binary
 transition_matrices = True
 
