@@ -17,9 +17,16 @@ import os
 import itertools
 
 
-from dask.distributed import Client, Variable , Queue
+from dask.distributed import Client, Variable , Queue , Lock
 from dask.distributed import  utils_perf
 import gc
+
+import dask.bag as db
+import dask.array as da
+import dask.dataframe as dd
+
+from dask.delayed import delayed
+
 
 #throttled = utils_perf.ThrottledGC()
 #gc.collect = throttled.collect
@@ -29,7 +36,23 @@ if __name__ == '__main__':
     sys.setrecursionlimit( 10 **8 )
     runName = 'sparsemat_AAtransition'
     #number of cores to use
-    NCORE = 300
+    NCORE = 100
+    ncpu = 10
+    from dask_jobqueue import SLURMCluster
+
+    cluster = SLURMCluster(
+        cores=ncpu,
+        memory="10 GB"
+    )
+
+    cluster.adapt(minimum = 50,  maximum=NCORE)
+    print(cluster.dashboard_link)
+    client = Client(cluster)
+    print('cluster deploy sleep')
+    #wait for cluster deploy
+    time.sleep( 5 )
+    print('done')
+
 
     #fraction of genomes to remove if jackknifing
     bootstrap = .2
@@ -53,20 +76,6 @@ if __name__ == '__main__':
 
 
     #create distributed cluster
-    from dask_jobqueue import SLURMCluster
-
-    cluster = SLURMCluster(
-        cores=10,
-        memory="20 GB"
-    )
-
-    cluster.adapt( maximum=NCORE)
-    print(cluster.dashboard_link)
-    client = Client(cluster)
-    print('cluster deploy sleep')
-    #wait for cluster deploy
-    time.sleep( 20 )
-    print('done')
 
 
     #use blast based annotation to assign codons to column ranges
@@ -115,24 +124,25 @@ if __name__ == '__main__':
         with h5py.File(alnfile +'.h5', 'r') as hf:
             align_array = hf['MSA2array']
             print('array shape' ,align_array.shape)
-
             dummy_annot = {'dummy_gene': { 'qstart':1 , 'qend':align_array.shape[1]-1 , 'evalue':0  }}
             annotation = pd.DataFrame.from_dict( dummy_annot , orient = 'index')
     print('selecting informative sites')
-    def retcounts(index , col):
-        return index, np.unique(col.ravel() , return_counts=True)
-    colfutures =[]
+
+
+    def retcounts( row ):
+        return  np.unique( row , return_counts=True)
 
     with h5py.File(alnfile +'.h5', 'r') as hf:
         align_array = hf['MSA2array']
-        print('array shape' ,align_array.shape)
-
-        for col in range(align_array.shape[1]):
-            colfutures.append( client.submit( retcounts, col, align_array[:,col] ) )
-        res = client.gather(colfutures)
-
-    sites= { col : dict(zip(list(unique[0]), list(unique[1]))) for col,unique in res }
-    informativesites = set([ s for s in sites if len( set( sites[s].keys()) -set([b'-',b'N']) ) > 1  ] )
+        array = da.from_array(align_array)
+        array = da.transpose(array)
+        #create a df of the columns
+        daskdf = dd.from_dask_array(array)
+        daskdf['unique']= daskdf.apply( retcounts  , axis =1)
+        res = list( daskdf['unique'].compute() )
+        print('compiling sites')
+        sites= { col : dict(zip(list(unique[0]), list(unique[1]))) for col,unique in enumerate(res) }
+        informativesites = set([ s for s in sites if len( set( sites[s].keys()) -set([b'-',b'N']) ) > 1  ] )
 
     print('done')
     print('informative columns:' , len(informativesites))
@@ -160,21 +170,6 @@ if __name__ == '__main__':
     IDindex = dict(zip( IDs.values() , IDs.keys() ) )
     print( [(t,IDindex[t]) for t in list(IDindex.keys())[0:10]] )
 
-
-    print('selecting informative sites')
-    #find all sites with mutations
-    def retcounts(index , col):
-        return index, np.unique(col.ravel() , return_counts=True)
-    a = client.submit( retcounts, 10, align_array[:,10] )
-    print(a.result())
-    colfutures =[]
-    for col in range(align_array.shape[1]):
-        colfutures.append( client.submit( retcounts, col, align_array[:,col] ) )
-    res = client.gather(colfutures)
-    sites= { col : dict(zip(list(unique[0]), list(unique[1]))) for col,unique in res }
-    informativesites = set([ s for s in sites if len( set( sites[s].keys()) -set([b'-',b'N']) ) > 1  ] )
-    print(len(informativesites))
-    print('done')
 
     ####small parsimony functions ##########
     def process_node_smallpars_1(node):
@@ -244,7 +239,7 @@ if __name__ == '__main__':
                 if child.char is None:
                     process_node_smallpars_2(child)
 
-    def calculate_small_parsimony(inq, outq, stopiter, treefile, matfile, row_index, iolock , verbose  = False ):
+    def calculate_small_parsimony(inq, outq, stopiter, treefile, matfile,bootstrap_replicates, row_index, iolock , verbose  = False ):
         #setup the tree and matrix for each worker
         with h5py.File(matfile) as hf:
             align_array = hf['MSA2array']
@@ -271,13 +266,22 @@ if __name__ == '__main__':
                 l.calc = {}
 
 
+
             #work on a fresh tree each time
             while stopiter == False or inq.qsize()>0:
                 codon ,pos = inq.get()
                 #assign leaf values
 
+
                 #repeat here for bootstrap
+
                 for i in range(bootsrap_replicates):
+                    #select portion of random genomes to take out
+                    if bootstrap_replicates >1:
+                        del_genomes = set(np.random.randint( align_array.shape[0], size= int(align_array.shape[0]*bootstrap) ) )
+                    else:
+                        del_genomes = set([])
+
                     #change a subset of leaves to ambiguous characters
                     for pos,col in enumerate(pos):
                         for l in t.leaf_nodes():
@@ -301,10 +305,12 @@ if __name__ == '__main__':
                                 l.scores[pos] = { c:10**10 for c in allowed_symbols }
                                 if str(l.taxon).replace("'", '') in row_index:
 
-                                    char = char = align_array[ row_index[str(l.taxon).replace("'", '')] , col[0] ]
+                                    char = align_array[ row_index[str(l.taxon).replace("'", '')] , col[0] ]
                                     if char.upper() in allowed_symbols:
                                         l.symbols[pos] = { char }
                                         l.scores[pos][char] = 0
+                                    elif col[0] in del_genomes:
+                                        l.symbols[pos] =  allowed_symbols
                                     else:
                                         #ambiguous leaf
                                         l.symbols[pos] =  allowed_symbols
@@ -413,41 +419,41 @@ if __name__ == '__main__':
     #scale cluster
     #scatter the blank tree and row index for each process
     #remote_tree = client.scatter(tree)
+
     remote_index = client.scatter(IDindex)
     inq = Queue()
     outq = Queue()
     lock = Lock('x')
+
+    stopiter = Variable(False)
+
+
     saver_started = False
     workers_started = False
-    stopiter = Variable(False)
-    #big for loop here generating the mats with futures
-    for n in range(bootstrap_replicates):
-        #select portion of random genomes to take out
-        if bootstrap_replicates >1:
-            del_genomes = np.random.randint( align_array.shape[0], size= int(align_array.shape[0]*bootstrap) )
 
 
-        for annot_index,annot_row in annotation.iterrows():
-            #indexing starts at 1 for blast
-            #####switch to sending the coordinates and masking for the matrix
-            for j,codon in enumerate(range(annot_row.qstart-1, annot_row.qend-1 , 3 )):
-                positions = []
-                for col in [codon, codon+1 , codon+2]:
-                    if col in informativesites:
-                        positions.append( (col, None) )
-                    else:
-                        #just add the alignment character if it doesnt change.
-                        positions.append( (col, align_array[0,col] ) )
-                #submit codons
-                inq.put( (codon, positions)  )
-                if workers_started == False and  inq.qsize() > start_worker_trigger:
-                    #start workers
-                    for workers in range(NCORE):
-                        client.submit(  calculate_small_parsimony , inq= inq ,outq = outq ,stopiter= stopiter ,  treefile=treefile  ,  row_index= remote_index , iolock = lock, verbose  = False  )
+    for annot_index,annot_row in annotation.iterrows():
+        #indexing starts at 1 for blast
+        #####switch to sending the coordinates and masking for the matrix
+        for j,codon in enumerate(range(annot_row.qstart-1, annot_row.qend-1 , 3 )):
+            positions = []
+            for col in [codon, codon+1 , codon+2]:
+                if col in informativesites:
+                    positions.append( (col, None) )
+                else:
+                    #just add the alignment character if it doesnt change.
+                    positions.append( (col, align_array[0,col] ) )
+            #submit codons
+            inq.put( (codon, positions)  )
+            if workers_started == False and  inq.qsize() > start_worker_trigger:
+                #start workers
+                for workers in range(NCORE):
+                    client.submit(  calculate_small_parsimony , inq= inq ,outq = outq ,stopiter= stopiter ,  treefile=treefile , bootstrap_replicates = bootstrap_replicates,
+                     matfile= alnfile+'.h5' ,  row_index= remote_index , iolock = lock, verbose  = False  )
 
-                if saver_started == False and  inq.qsize() > future_clean_trigger:
-                    print('starting saver')
-                    client.submit(  collect_futures , queue= queue , stopiter=stopiter , runName= runName , nucleotides_only =False  )
-                    saver_started = True
-    stopiter.set(True)
-    print('done iterating')
+            if saver_started == False and  inq.qsize() > future_clean_trigger:
+                print('starting saver')
+                client.submit(  collect_futures , queue= outq , stopiter=stopiter , runName= runName , nucleotides_only =False  )
+                saver_started = True
+        stopiter.set(True)
+        print('done iterating')
