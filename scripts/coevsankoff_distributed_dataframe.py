@@ -37,7 +37,7 @@ if __name__ == '__main__':
     runName = 'sparsemat_AAtransition'
     #number of cores to use
 
-    distributed_computation = True
+    distributed_computation = False
 
     if distributed_computation == True:
         NCORE = 100
@@ -70,17 +70,17 @@ if __name__ == '__main__':
     #number of replicates
     bootstrap_replicates = 50
     restart = None
-    nucleotides_only = False
+    nucleotides_only = True
     #keep track of transitions and not just events as binary
     transition_matrices = True
     future_clean_trigger = 100
     start_worker_trigger = 100
 
-    treefile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
-    alnfile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
+    #treefile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
+    #alnfile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
 
-    #treefile = '../validation_data/16s/16s_salaminWstruct_aln.fasta.treefile'
-    #alnfile = '../validation_data/16s/16s_salaminWstruct_aln.fasta'
+    treefile = '../validation_data/16s/16s_salaminWstruct_aln.fasta.treefile'
+    alnfile = '../validation_data/16s/16s_salaminWstruct_aln.fasta'
 
     #treefile = '../validation_data/dengue/dengue_all.aln.fasta.treefile'
     #alnfile = '../validation_data/dengue/dengue_all.aln.fasta'
@@ -253,13 +253,29 @@ if __name__ == '__main__':
                 if child.char is None:
                     process_node_smallpars_2(child)
 
-    def calculate_small_parsimony( df, tree , row_index , bootstrap , array_size , verbose  = False ):
+    def calculate_small_parsimony( df, tree , row_index , bootstrap , array_size , replicate , verbose  = False ):
+        replicate = str(replicate)
+
+        if df.iloc[0,0] =='foo':
+            print(df)
+            print('dummy data')
+
+            #eventdict[pos] = { replicate+'_type': eventtypes , 'index' : eventindex , 'AAeventindex':AAeventindex , 'AAeventypes': AAeventypes }
+
+            if replicate == '0':
+                eventdict = { k:{ replicate+'type': [] , replicate+'index' : [] , replicate+'AAeventindex':[] , replicate+'AAeventypes': [] , 'pos':0  } for k in range(len(df))  }
+            else:
+                eventdict = { k:{ replicate+'type': [] , replicate+'index' : [] , replicate+'AAeventindex':[] , replicate+'AAeventypes': [] } for k in range(len(df))  }
+            ret = pd.DataFrame.from_dict( eventdict , orient = 'index' )
+
+            return ret
 
         #df is 3 columns of a codons
         #setup the tree and matrix for each worker
         missing = 0
         sys.setrecursionlimit( 10 **8 )
         t = copy.deepcopy(pickle.loads(tree))
+
         #assign leaf values
         #repeat here for bootstrap
         if bootstrap is not None:
@@ -267,7 +283,6 @@ if __name__ == '__main__':
             del_genomes = set(np.random.randint( array_size , size= int( array_size *bootstrap) ) )
         else:
             del_genomes = set([])
-
 
         #codon position
         pos =0
@@ -302,17 +317,18 @@ if __name__ == '__main__':
         eventdict = {}
         AAeventindex = [ n.matrow for n in t.nodes() if n.AAevent  ]
         AAeventypes = [ n.AAevent for n in t.nodes() if n.AAevent  ]
-        for pos in [0,1,2]:
+        for pos,i in enumerate(df.index):
             eventindex = [ n.matrow for n in t.nodes() if n.event[pos] > 0 ]
             eventtypes = [ n.eventype[pos] for n in t.nodes() if n.event[pos] > 0 ]
-            if pos ==0:
-                eventdict[pos] = { 'type': eventtypes , 'index' : eventindex , 'AAeventindex':AAeventindex , 'AAeventypes': AAeventypes }
+            if pos==0:
+                eventdict[i] = { replicate+'type': eventtypes , replicate+'index' : eventindex , replicate+'AAeventindex':AAeventindex , replicate+'AAeventypes': AAeventypes  }
             else:
-                eventdict[pos] = { 'type': eventtypes , 'index' : eventindex , 'AAeventindex':[] , 'AAeventypes': [] }
+                eventdict[i] = { replicate+'type': eventtypes , replicate+'index' : eventindex , replicate+'AAeventindex':[] , replicate+'AAeventypes': [] }
+            if replicate == '0':
+                eventdict[i]['pos'] = pos
 
         retdf = pd.DataFrame.from_dict(eventdict, orient = 'index' )
         return retdf
-
     def save_mats(count, runName, AA_mutation,nucleotide_mutation):
         print('saving')
         with open( runName + '_coevmat_AAmutations.pkl' , 'wb') as coevout:
@@ -322,24 +338,33 @@ if __name__ == '__main__':
         print('done saving')
 
 
-    def collect_futures(  runName  , check_interval= 10 , save_interval = 60, nucleotides_only =False  ):
+    def retsum(df):
+        #testing functions
+        print(df)
+        if df.iloc[0,0] =='foo':
+            print('dummy data')
+            ret = pd.DataFrame.from_dict( { k:{ 'sum':0 } for k in range(len(df))  } , orient = 'index' )
+
+        else:
+            s = df['codon'].sum()
+            ret = pd.DataFrame.from_dict( { k:{ 'sum':s } for k in range(len(df))  } , orient = 'index' )
+        ret.index = df.index
+        print(ret)
+        return ret
+
+    def compute_matrices(  resdf  , k  ):
+
         AA_mutation = None
         nucleotide_mutation = None
         t0 = time.time()
         runtime = time.time()
         count = 0
-        outq = Queue('outq')
-        stopiter = Variable('stopiter')
-
-        while stopiter == False:
-            #wait a little while
-            result = outq.get()
-            #get next job completed
-            result = future.result()
-            column, eventdict , AAeventindex , AAeventypes= result
-            #save each position to event mats
-            for pos in [0,1,2]:
-                col = column+pos
+        for idx,row in resdf.itterrows():
+            for rep in range(k):
+                #get next job completed
+                eventdict , AAeventindex , AAeventypes= row[[replicate+'type' , replicate+'index' , replicate+'AAeventindex' , replicate+'AAeventypes']]
+                #save each position to event mats
+                col = idx[1]
                 eventindex = eventdict[pos]['index']
                 eventtypes = eventdict[pos]['type']
                 if len(eventindex)>0:
@@ -347,42 +372,12 @@ if __name__ == '__main__':
                         nucleotide_mutation  += sparseND.COO( coords =  ( eventindex  , np.ones(len(selectrows )) * col   , eventtypes ) , data = np.ones(len(eventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transition_dict) ),  dtype = np.int32   )
                     else:
                         nucleotide_mutation  =  sparseND.COO( coords = ( eventindex ,  np.ones(len(selectrows )) * col   , eventtypes ) , data = np.ones(len(eventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transition_dict) ),  dtype = np.int32   )
-            if nucleotides_only == False:
-                if AA_mutation:
-                    AA_mutation  += sparseND.COO( coords =  (AAeventindex , np.ones(len(AAeventindex)) * column , AAeventypes ) , data = np.ones(len(AAeventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transitiondict_AA ) ) ,  dtype = np.int32  )
-                else:
-                    AA_mutation  = sparseND.COO( coords =  (AAeventindex , np.ones(len(AAeventindex)) * column , AAeventypes ) , data = np.ones(len(AAeventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transitiondict_AA ) )   ,  dtype = np.int32 )
-            count +=1
-            if time.time() - runtime > save_interval:
-                print('saving', time.time()-t0)
-                runtime = time.time()
-                save_mats(count, runName, AA_mutation,nucleotide_mutation)
-        #finish up
-        print('FINAL SAVE !')
-
-        for result in  queue.get( timeout=None, batch=True):
-                #get next job completed
-                column, eventdict , AAeventindex , AAeventypes= result
-                #save each position to event mats
-                for pos in [0,1,2]:
-                    col = column+pos
-                    eventindex = eventdict[pos]['index']
-                    eventtypes = eventdict[pos]['type']
-                    if len(eventindex)>0:
-                        if nucleotide_mutation:
-                            nucleotide_mutation  += sparseND.COO( coords =  ( eventindex  , np.ones(len(selectrows )) * col   , eventtypes ) , data = np.ones(len(eventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transition_dict) ),  dtype = np.int32    )
-                        else:
-                            nucleotide_mutation  =  sparseND.COO( coords = ( eventindex ,  np.ones(len(selectrows )) * col   , eventtypes ) , data = np.ones(len(eventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transition_dict) ),  dtype = np.int32   )
                 if nucleotides_only == False:
                     if AA_mutation:
                         AA_mutation  += sparseND.COO( coords =  (AAeventindex , np.ones(len(AAeventindex)) * column , AAeventypes ) , data = np.ones(len(AAeventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transitiondict_AA ) ) ,  dtype = np.int32  )
                     else:
                         AA_mutation  = sparseND.COO( coords =  (AAeventindex , np.ones(len(AAeventindex)) * column , AAeventypes ) , data = np.ones(len(AAeventindex)  ,  ) , shape = (matsize[0] , matsize[1] ,len(transitiondict_AA ) )   ,  dtype = np.int32 )
-                count +=1
-
-        save_mats(count, runName, AA_mutation,nucleotide_mutation)
-        finished = Variable('saverDone')
-        finished.set(True)
+        return nucleotide_mutation, AA_mutation
 
         print('DONE ! ')
         return None
@@ -400,13 +395,17 @@ if __name__ == '__main__':
 
         #create a df of the columns
         daskdf = dd.from_dask_array(array)
+        #daskdf = pd.DataFrame(data = align_array.T)
+        print(array.shape)
         print('done')
         row_index = IDindex
         keep_codons = []
         keep_positions = []
         count =0
 
-
+        print( len(daskdf))
+        daskdf = daskdf.dropna()
+        print( len(daskdf))
 
         #init the blank tree
         for i,n in enumerate(tree.nodes()):
@@ -442,29 +441,52 @@ if __name__ == '__main__':
                 if keep_codon == True:
                     keep_codons += [count,count,count]
                     keep_positions += positions
+
                 count+=1
 
-        keep_positions.reverse()
-        keep_codons.reverse()
-
         print(keep_positions[0:100])
+        print(len(keep_positions))
         print( keep_codons[0:100] )
-
+        print(len(keep_codons))
         print('selecting')
 
-        daskdf= daskdf.loc[keep_positions]
-        daskdf['codon']= keep_codon
-        #daskdf = client.persist(daskdf)
+        daskdf= daskdf.loc[keep_positions,:]
+        daskdf['codon'] = da.from_array(keep_codons)
+        #daskdf['codon'] = np.array(keep_codons)
         print('done')
         #apply sankof to keep_codons
-        res =[]
+        daskdf.columns = daskdf.columns.map(lambda x: str(x) )
 
 
-
-
+        ret = None
         for k in range(bootstrap_replicates):
             print('replicate:' , k )
-            res.append( daskdf.groupby('codon').apply( calculate_small_parsimony , tree= remote_tree , row_index = row_index , bootstrap = bootstrap , array_size= align_array.shape[0] ,
-            meta={ 'type': 'object' , 'index' : 'object' , 'AAeventindex':'object' , 'AAeventypes': 'object' }  ).compute() )
+            k = str(k)
+            if ret is None:
+                ret = daskdf.groupby('codon' , sort = False ).apply( calculate_small_parsimony , tree= remote_tree , row_index = row_index ,  bootstrap = bootstrap , array_size= align_array.shape[0] , replicate = k  )
+
+            else:
+                m = daskdf.groupby('codon' , sort = False ).apply( calculate_small_parsimony , tree= remote_tree , row_index = row_index ,  bootstrap = bootstrap , array_size= align_array.shape[0] , replicate = k  )
+                ret = ret.merge(m , left_index = True, right_index = True )
+
+
+            dfs = ret.to_delayed()
+            matrices = [ delayed(compute_matrices)(df,k) for df in dfs ]
+            
+            #do binary sum
+            L = matrices
+            while len(L) > 1:
+                new_L = []
+                for i in range(0, len(L), 2):
+                    lazy = add_sparsemats(L[i], L[i + 1])  # add neighbors
+                    new_L.append(lazy)
+                L = new_L                       # swap old list for new
+            sparsemats = dask.compute(L)
+
+
+            print(ret)
+
+
             print('done')
+
         #make sparse matrices from delayed
