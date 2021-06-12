@@ -5,6 +5,7 @@
 #SBATCH --mem=100G
 #SBATCH --time=08:00:00
 #SBATCH --job-name=python
+#SBATCH --output=master_slurm.out
 
 
 

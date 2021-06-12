@@ -267,7 +267,7 @@ if __name__ == '__main__':
             walltime='12:00:00',
             n_workers = NCORE,
             cores=ncpu,
-            #cores=20,
+            interface='ib0',
             processes=1,
             memory="8GB",
             env_extra=[
