@@ -2,7 +2,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=20
-#SBATCH --mem=50G
+#SBATCH --mem=100G
 #SBATCH --time=08:00:00
 #SBATCH --job-name=python
 

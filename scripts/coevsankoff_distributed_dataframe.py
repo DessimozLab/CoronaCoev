@@ -16,6 +16,8 @@ import sys
 import os
 import itertools
 
+
+
 import dask
 from dask.distributed import Client, Variable , Queue , Lock , LocalCluster
 from dask.distributed import  utils_perf
@@ -256,48 +258,49 @@ if __name__ == '__main__':
     distributed_computation = True
 
     if distributed_computation == True:
-        NCORE = 50
-        ncpu = 10
+        NCORE = 100
+        ncpu = 1
 
         print('deploying cluster')
         from dask_jobqueue import SLURMCluster
-
         cluster = SLURMCluster(
+            walltime='12:00:00',
             n_workers = NCORE,
             cores=ncpu,
-            memory="25 GB"
+            #cores=20,
+            processes=1,
+            memory="8GB",
+            env_extra=[
+            'source /scratch/dmoi/miniconda/etc/profile.d/conda.sh',
+            'conda activate ML'
+            ]
         )
 
+        #cluster.adapt(minimum=40, maximum=NCORE)
         #cluster.adapt(minimum = 50,  maximum=NCORE)
         print(cluster.dashboard_link)
-        client = Client(cluster)
-        print('cluster deploy sleep')
-        #wait for cluster deploy
-        time.sleep( 5 )
-        print('done')
+        client = Client(cluster , timeout='45s')
+        client.restart()
     else:
         NCORE = 10
         ncpu = 1
         print('testing')
-
-
         cluster = LocalCluster(n_workers = NCORE )
         #cluster.adapt(minimum = 50,  maximum=NCORE)
         print(cluster.dashboard_link)
         client = Client(cluster)
-        print('cluster deploy sleep')
 
 
-        client = Client()
 
     #fraction of genomes to remove if jackknifing
     bootstrap = .2
     #number of replicates
     bootstrap_replicates = 50
 
-
+    overwrite = False
     restart = None
-    nucleotides_only = True
+
+    nucleotides_only = False
 
     blastpath = '/scratch/dmoi/software/ncbi-blast-2.11.0+-src/c++/ReleaseMT/bin/'
 
@@ -315,10 +318,7 @@ if __name__ == '__main__':
     treefile = '/scratch/dmoi/datasets/covid_data/30_may/mmsa_2021-06-01/global.tree'
     alnfile = '/scratch/dmoi/datasets/covid_data/30_may/mmsa_2021-06-01/2021-06-01_masked.fa'
 
-
     #create distributed cluster
-
-
     #use blast based annotation to assign codons to column ranges
     allowed_symbols = [ b'A', b'C', b'G' , b'T' ]
     allowed_transitions = [ c1+c2 for c1 in allowed_symbols for c2 in allowed_symbols  if c1!= c2]
@@ -332,51 +332,95 @@ if __name__ == '__main__':
     print('transition dict', transition_dict)
     ProteinAlphabet = [ 'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y' ]
     allowed_AA_transitions = [ c1+c2 for c1 in ProteinAlphabet for c2 in ProteinAlphabet  if c1!= c2]
-    print(allowed_AA_transitions[0:100] , '...etc...')
+    print('allowed_AA_transitions:', allowed_AA_transitions[0:100] , '...etc...')
 
     transitiondict_AA = {  c : i  for i,c in enumerate( allowed_AA_transitions )  }
     rev_transitiondict_AA = dict( zip(transitiondict_AA.values(), transitiondict_AA.keys()))
 
-
-    tree = dendropy.Tree.get(
-        path=treefile,
-        schema='newick')
-
     #### creat hdf5 aln ###
-    if os.path.exists(alnfile +'.h5'):
+    if os.path.exists(alnfile +'.h5') and overwrite == False:
         pass
     else:
         print('aln2numpy ')
-        msa = SeqIO.parse(alnfile , format = 'fasta')
-        align_array = np.array([ list(rec.upper())  for rec in msa], np.character)
-        print('done')
-        print('dumping to hdf5')
-        with h5py.File(alnfile +'.h5', 'w' ) as hf:
-            hf.create_dataset("MSA2array",  data=align_array)
+
+
+        def ret_msa(alnfile):
+            with open( alnfile ,'r') as msa:
+                ret = []
+                s = None
+                for l in msa:
+                    if '>' not in l:
+                        if s:
+                            s+=l.strip()
+                        else:
+                            s = l.strip()
+                    else:
+                        if s:
+                            ret.append(list(s.upper()))
+                            s = None
+                            if len(ret) > 1000:
+                                yield np.array(ret,  np.dtype('S1') ).T
+                                ret = []
+                                s = None
+                if len( ret ) > 0:
+                    yield np.array(ret, np.dtype('S1')).T
+
+        gen = ret_msa(alnfile)
+        chunk = next(gen)
+        dtype = chunk.dtype
+        row_count = chunk.shape[1]
+        print(chunk)
+        maxshape = ( 30000, 1000000)
+        with h5py.File(alnfile +'.h5', 'w' ) as f:
+            # Initialize a resizable dataset to hold the output
+            #maxshape = (None,None) + chunk.shape[1:]
+            dset = f.create_dataset('MSA2array', shape=chunk.shape, maxshape=maxshape,
+                                    chunks=chunk.shape, dtype=chunk.dtype)
+
+            dset[0:chunk.shape[0], 0:chunk.shape[1]] = chunk
+
+            for i,chunk in enumerate(gen):
+                if i % 10 == 0:
+                    print(dset.shape)
+
+                # Resize the dataset to accommodate the next chunk of rows
+                dset.resize(row_count + chunk.shape[1], axis=1)
+                # Write the next chunk
+                dset[0:chunk.shape[0],row_count:] = chunk
+                row_count += chunk.shape[1]
         print('done')
 
     ###get nonstatic sites
     def retcounts( row ):
         return  np.unique( row , return_counts=True)
 
+    print('finding informative aln columns')
     with h5py.File(alnfile +'.h5', 'r') as hf:
         align_array = hf['MSA2array']
-        array = da.from_array(align_array)
-        array = da.transpose(array)
+        array = da.from_array(align_array , chunks = {0: 1000})
+        #array = da.transpose(array)
         #create a df of the columns
         daskdf = dd.from_dask_array(array)
+        daskdf = daskdf.repartition(npartitions= NCORE  )
         daskdf['unique']= daskdf.apply( retcounts  , axis =1 , meta = (None, 'object') )
-        res = list( daskdf['unique'].compute() )
-
+        res = list( daskdf['unique'].compute())
+        #daskdf = client.persist(daskdf)
         print('compiling sites')
         sites= { col : dict(zip(list(unique[0]), list(unique[1]))) for col,unique in enumerate(res) }
         informativesites = set([ s for s in sites if len( set( sites[s].keys()) -set([b'-',b'N']) ) > 1  ] )
-
+        #daskdf = daskdf.repartition(npartitions= NCORE * ncpu )
     print('done')
     print('informative columns:' , len(informativesites))
 
     def clipID(ID):
         return ID.replace('|',' ').replace('_',' ').replace('/',' ').strip()
+
+    print('reading tree')
+    tree = dendropy.Tree.get(
+        path=treefile,
+        schema='newick')
+    print('done')
+
 
     print('preparing tree IDs')
     msa = SeqIO.parse(alnfile , format = 'fasta')
@@ -395,9 +439,10 @@ if __name__ == '__main__':
         if os.path.exists(alnfile +'annotation.csv' ):
             annotation = pd.read_csv( alnfile +'annotation.csv' )
         else:
-            with h5py.File(alnh5, 'r') as hf:
+            with h5py.File(alnfile + '.h5', 'r') as hf:
                 align_array = hf['MSA2array']
-                aln_row = align_array[IDindex[seq],:]
+                aln_row = align_array[:,IDindex[seq]]
+
                 nongap_cols = [ i for i,c in enumerate(list(aln_row)) if c != b'-' ]
                 print('nongap:' , nongap_cols[0:100] , '...')
                 submat_aln = align_array[0,nongap_cols ]
@@ -485,104 +530,85 @@ if __name__ == '__main__':
 
     #######start the sankof algo here #######################
     print('starting sankof')
-    with h5py.File(alnfile +'.h5', 'r', libver='latest', swmr=True ) as hf:
-        print('loading aln array')
-        align_array = hf['MSA2array'][:]
-        retmatsize = (len(tree.nodes()) , int(align_array.shape[1]) )
-        print('retmatsize:' , retmatsize)
-        array = da.from_array(align_array, chunks= NCORE)
-        array = da.transpose(array)
+    #daskdf = pd.DataFrame(data = align_array.T)
+    row_index = IDindex
+    keep_codons = []
+    keep_positions = []
+    count =0
+    daskdf = daskdf.dropna()
 
-        #create a df of the columns
-        daskdf = dd.from_dask_array(array )
+    #init the blank tree
+    for i,n in enumerate(tree.nodes()):
+        n.matrow = i
+        n.symbols = None
+        n.scores = None
+        n.event = None
+        n.char = None
+        n.eventype = None
+        n.AAevent = 0
 
-        #daskdf = pd.DataFrame(data = align_array.T)
-        print('aln array shape:',array.shape)
-        print('done')
-        row_index = IDindex
-        keep_codons = []
-        keep_positions = []
-        count =0
-
-        daskdf = daskdf.dropna()
-
-        #init the blank tree
-        for i,n in enumerate(tree.nodes()):
-            n.matrow = i
-            n.symbols = None
-            n.scores = None
-            n.event = None
-            n.char = None
-            n.eventype = None
-            n.AAevent = 0
-
-        for i,l in enumerate(tree.leaf_nodes()):
-            l.event = {}
-            l.scores = {}
-            l.symbols = {}
-            l.char= {}
-            l.calc = {}
-        remote_tree = client.scatter( pickle.dumps(tree) )
-        row_index = client.scatter(row_index )
+    for i,l in enumerate(tree.leaf_nodes()):
+        l.event = {}
+        l.scores = {}
+        l.symbols = {}
+        l.char= {}
+        l.calc = {}
+    remote_tree = client.scatter( pickle.dumps(tree) )
+    row_index = client.scatter(row_index )
 
 
-        for annot_index,annot_row in annotation.iterrows():
-            #indexing starts at 1 for blast
-            #####switch to sending the coordinates and masking for the matrix
-            for j,codon in enumerate(range(annot_row.qstart-1, annot_row.qend-1 , 3 )):
-                positions = []
-                keep_codon = False
-                for col in [codon, codon+1 , codon+2]:
-                    if col in informativesites:
-                        keep_codon = True
-                        #just add the alignment character if it doesnt change.
-                    positions.append( col )
-                if keep_codon == True:
-                    keep_codons += [count,count,count]
-                    keep_positions += positions
+    for annot_index,annot_row in annotation.iterrows():
+        #indexing starts at 1 for blast
+        #####switch to sending the coordinates and masking for the matrix
+        for j,codon in enumerate(range(annot_row.qstart-1, annot_row.qend-1 , 3 )):
+            positions = []
+            keep_codon = False
+            for col in [codon, codon+1 , codon+2]:
+                if col in informativesites:
+                    keep_codon = True
+                    #just add the alignment character if it doesnt change.
+                positions.append( col )
+            if keep_codon == True:
+                keep_codons += [count,count,count]
+                keep_positions += positions
+            count+=1
 
-                count+=1
+    print('selecting')
+    daskdf= daskdf.loc[keep_positions]
+    print('positions to analyze:', len(daskdf))
+    daskdf['codon'] = dd.from_array(np.array(keep_codons))
+    #daskdf['codon'] = np.array(keep_codons)
+    print('done')
 
-        print('selecting')
-        daskdf= daskdf.loc[keep_positions]
-        print('positions to analyze:', len(daskdf))
-        daskdf['codon'] = dd.from_array(np.array(keep_codons))
-        #daskdf['codon'] = np.array(keep_codons)
-        print('done')
-        #apply sankof to keep_codons
-        daskdf.columns = daskdf.columns.map(lambda x: str(x) )
-
-        """if distributed_computation == True:
-            daskdf.repartition( npartitions = NCORE * ncpu - (NCORE * ncpu)%3 )
+    #apply sankof to keep_codons
+    daskdf.columns = daskdf.columns.map(lambda x: str(x) )
+    ret = None
+    for k in range(bootstrap_replicates):
+        print('replicate:' , k )
+        k = str(k)
+        if ret is None:
+            ret = daskdf.groupby('codon' ).apply( calculate_small_parsimony , tree= remote_tree , row_index = row_index ,  bootstrap = bootstrap , array_size= align_array.shape[0] , replicate = k  )
         else:
-            daskdf.repartition( npartitions = NCORE - NCORE%3 )
-        """
-        ret = None
-        for k in range(bootstrap_replicates):
-            print('replicate:' , k )
-            k = str(k)
-            if ret is None:
-                ret = daskdf.groupby('codon' ).apply( calculate_small_parsimony , tree= remote_tree , row_index = row_index ,  bootstrap = bootstrap , array_size= align_array.shape[0] , replicate = k  )
-            else:
-                m = daskdf.groupby('codon' ).apply( calculate_small_parsimony , tree= remote_tree , row_index = row_index ,  bootstrap = bootstrap , array_size= align_array.shape[0] , replicate = k  )
-                ret = ret.merge(m , left_index = True, right_index = True )
-            dfs = ret.to_delayed()
-            matrices = [ delayed(compute_matrices)(df,k, retmatsize) for df in dfs ]
-            #do binary sum
-            L = matrices
-            while len(L) > 1:
-                new_L = []
-                for i in range(0, len(L), 2):
-                    try:
-                        lazy = delayed(add_sparsemats)(L[i], L[i + 1])  # add neighbors
-                    except:
-                        lazy = L[i]
-                    new_L.append(lazy)
-                L = new_L                       # swap old list for new
-            sparsemats = dask.compute(L)
-            with open( alnfile +'_' + k +'_coevmats.pkl' , 'wb') as coevout:
-                print('saving',sparsemats)
-                coevout.write(pickle.dumps(sparsemats))
-                print('done')
-        print('DONE!')
-        #make sparse matrices from delayed
+            m = daskdf.groupby('codon' ).apply( calculate_small_parsimony , tree= remote_tree , row_index = row_index ,  bootstrap = bootstrap , array_size= align_array.shape[0] , replicate = k  )
+            ret = ret.merge(m , left_index = True, right_index = True )
+        dfs = ret.to_delayed()
+        matrices = [ delayed(compute_matrices)(df,k, retmatsize) for df in dfs ]
+        #do binary sum
+
+        L = matrices
+        while len(L) > 1:
+            new_L = []
+            for i in range(0, len(L), 2):
+                try:
+                    lazy = delayed(add_sparsemats)(L[i], L[i + 1])  # add neighbors
+                except:
+                    lazy = L[i]
+                new_L.append(lazy)
+            L = new_L                       # swap old list for new
+        sparsemats = dask.compute(L)
+        with open( alnfile +'_' + k +'_coevmats.pkl' , 'wb') as coevout:
+            print('saving',sparsemats)
+            coevout.write(pickle.dumps(sparsemats))
+            print('done')
+    print('DONE!')
+    #make sparse matrices from delayed
