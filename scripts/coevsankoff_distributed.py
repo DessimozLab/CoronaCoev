@@ -16,6 +16,7 @@ import sys
 import os
 import itertools
 
+from dask.distributed import fire_and_forget
 
 from dask.distributed import Client, Variable , Queue , Lock
 from dask.distributed import  utils_perf
@@ -40,19 +41,38 @@ if __name__ == '__main__':
     ncpu = 10
     from dask_jobqueue import SLURMCluster
 
+
+
+
+    NCORE = 10
+    ncpu = 25
+
+    print('deploying cluster')
+    from dask_jobqueue import SLURMCluster
     cluster = SLURMCluster(
+        walltime='12:00:00',
+        n_workers = NCORE,
         cores=ncpu,
-        memory="10 GB"
+        interface='ib0',
+        processes=1,
+        memory="10GB",
+        env_extra=[
+        'source /scratch/dmoi/miniconda/etc/profile.d/conda.sh',
+        'conda activate ML'
+        ],
+        scheduler_options={'interface': 'ens2f0' }
+
     )
 
-    cluster.adapt(minimum = 50,  maximum=NCORE)
-    print(cluster.dashboard_link)
-    client = Client(cluster)
-    print('cluster deploy sleep')
-    #wait for cluster deploy
-    time.sleep( 5 )
-    print('done')
 
+    #cluster.adapt(minimum=NCORE, maximum=NCORE+20)
+    #cluster.scale(50)
+
+    time.sleep(5)
+
+    print(cluster)
+    print(cluster.dashboard_link)
+    client = Client(cluster , timeout='500s' , set_as_default=True )
 
     #fraction of genomes to remove if jackknifing
     bootstrap = .2
@@ -240,6 +260,8 @@ if __name__ == '__main__':
                     process_node_smallpars_2(child)
 
     def calculate_small_parsimony(inq, outq, stopiter, treefile, matfile,bootstrap_replicates, row_index, iolock , verbose  = False ):
+        inq = Queue('inq')
+        outq = Queue('outq')
         #setup the tree and matrix for each worker
         with h5py.File(matfile) as hf:
             align_array = hf['MSA2array']
@@ -336,15 +358,7 @@ if __name__ == '__main__':
                         eventdict[pos] = { 'type': eventtypes , 'index' : eventindex }
                     AAeventindex = [ n.matrow for n in t.nodes() if n.AAevent  ]
                     AAeventypes = [ n.AAevent for n in t.nodes() if n.AAevent  ]
-                    if verbose == True:
-                        iolock.acquire()
-                        print('smallpars done')
-                        print(eventdict)
-                        print(AAeventindex)
-                        iolock.release()
-
-                    outq.put( (col, eventdict , AAeventindex , AAeventypes) )
-
+                    outq.put(col, eventdict , AAeventindex , AAeventypes)
 
     def save_mats(count, runName, AA_mutation,nucleotide_mutation):
         print('saving')
@@ -355,17 +369,20 @@ if __name__ == '__main__':
         print('done saving')
 
 
-    def collect_futures(  queue  , stopiter  , runName  , check_interval= 10 , save_interval = 60, nucleotides_only =False  ):
+
+    def collect_futures(  queue  , stopiter  , brake , runName  , check_interval= 10 , save_interval = 60, nucleotides_only =False  ):
         AA_mutation = None
         nucleotide_mutation = None
         t0 = time.time()
         runtime = time.time()
         count = 0
+
+        #queue = Queue('outq')
         while stopiter == False:
             #wait a little while
             result = queue.get()
             #get next job completed
-            result = future.result()
+
             column, eventdict , AAeventindex , AAeventypes= result
             #save each position to event mats
             for pos in [0,1,2]:
@@ -410,9 +427,8 @@ if __name__ == '__main__':
         print('FINAL SAVE !')
         save_mats(count, runName, AA_mutation,nucleotide_mutation)
         print('DONE ! ')
+        brake.set(False)
         return None
-
-
 
     #######start the sankof algo here #######################
     print('starting sankof')
@@ -421,16 +437,27 @@ if __name__ == '__main__':
     #remote_tree = client.scatter(tree)
 
     remote_index = client.scatter(IDindex)
-    inq = Queue()
-    outq = Queue()
+
+    inq = Queue('inq')
+    outq = Queue('outq')
     lock = Lock('x')
 
     stopiter = Variable(False)
+    brake = Variable(True)
 
 
     saver_started = False
     workers_started = False
 
+    #start workers
+    for workers in range(NCORE*ncpu ):
+        w = client.submit(  calculate_small_parsimony , inq= None ,outq = None  ,stopiter= stopiter ,  treefile=treefile , bootstrap_replicates = bootstrap_replicates,
+        matfile= alnfile+'.h5' ,  row_index= remote_index , iolock = lock, verbose  = False  )
+        fire_and_forget(w)
+
+    s = client.submit(  collect_futures , queue= None , stopiter=stopiter , brake = brake, runName= runName , nucleotides_only =False  )
+    saver_started = True
+    fire_and_forget(s)
 
     for annot_index,annot_row in annotation.iterrows():
         #indexing starts at 1 for blast
@@ -445,15 +472,10 @@ if __name__ == '__main__':
                     positions.append( (col, align_array[0,col] ) )
             #submit codons
             inq.put( (codon, positions)  )
-            if workers_started == False and  inq.qsize() > start_worker_trigger:
-                #start workers
-                for workers in range(NCORE):
-                    client.submit(  calculate_small_parsimony , inq= inq ,outq = outq ,stopiter= stopiter ,  treefile=treefile , bootstrap_replicates = bootstrap_replicates,
-                     matfile= alnfile+'.h5' ,  row_index= remote_index , iolock = lock, verbose  = False  )
-
-            if saver_started == False and  inq.qsize() > future_clean_trigger:
-                print('starting saver')
-                client.submit(  collect_futures , queue= outq , stopiter=stopiter , runName= runName , nucleotides_only =False  )
-                saver_started = True
-        stopiter.set(True)
         print('done iterating')
+
+        while brake == True:
+            time.sleep(10)
+        stopiter.set(True)
+
+        print('DONE main')
