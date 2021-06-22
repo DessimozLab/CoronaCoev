@@ -15,6 +15,7 @@ import copy
 import sys
 import os
 import itertools
+import lzma
 
 from dask.distributed import fire_and_forget
 from dask.distributed import Client, Variable , Queue , Lock ,LocalCluster
@@ -100,14 +101,24 @@ def process_node_smallpars_2(node , verbose = False):
             if child.char is None:
                 process_node_smallpars_2(child)
 
+@dask.delayed
+def delayed_send(data):
+    return lzma.compress(pickle.dumps(data))
 
 @dask.delayed
-def prep_tree(tree , df , row_index , bootstrap = None ):
+def delayed_receive(data):
+    return pickle.loads( lzma.decompress(data) )
+
+@dask.delayed
+def calculate_small_parsimony(tree , df , row_index , replicate = 0, bootstrap = None ):
     #df is 3 columns of a codons
     #setup the tree and matrix for each worker
     missing = 0
-    sys.setrecursionlimit( 10 **8 )
-    t = pickle.loads(tree)
+
+    replicate = str(replicate)
+    sys.setrecursionlimit( 10 **9 )
+    t = pickle.loads(lzma.decompress(tree))
+    df = pickle.loads(lzma.decompress(df))
     #assign leaf values
     #repeat here for bootstrap
     if bootstrap is not None :
@@ -141,15 +152,8 @@ def prep_tree(tree , df , row_index , bootstrap = None ):
                 l.symbols[pos] =  allowed_symbols
             l.char[pos] = min(l.scores[pos], key=l.scores[pos].get)
         pos+=1
-    return pickle.dumps(t)
 
-@dask.delayed
-def calculate_small_parsimony( t  , replicate, verbose  = False ):
-    sys.setrecursionlimit( 10 **8 )
-    t = pickle.loads(t)
-    #done tree init
-    #up
-    replicate = str(replicate)
+
     process_node_smallpars_1(t.seed_node)
     #down
     process_node_smallpars_2(t.seed_node)
@@ -169,18 +173,6 @@ def calculate_small_parsimony( t  , replicate, verbose  = False ):
     retdf = pd.DataFrame.from_dict(eventdict, orient = 'index' )
     return retdf
 
-def retsum(df):
-    #testing functions
-    print(df)
-    if df.iloc[0,0] =='foo':
-        print('dummy data')
-        ret = pd.DataFrame.from_dict( { k:{ 'sum':0 } for k in range(len(df))  } , orient = 'index' )
-    else:
-        s = df['codon'].sum()
-        ret = pd.DataFrame.from_dict( { k:{ 'sum':s } for k in range(len(df))  } , orient = 'index' )
-    ret.index = df.index
-    print(ret)
-    return ret
 
 ###compute spares matrics from results #######################################################################
 
@@ -196,7 +188,8 @@ def compute_matrices(  resdf  , k , matsize , transitionsNT = 12 , transitionsAA
             eventtypes , eventindex , AAeventindex , AAeventypes= row[[replicate+'type' , replicate+'index' , replicate+'AAeventindex' , replicate+'AAeventypes']]
             eventtypes , eventindex , AAeventindex , AAeventypes = [ list(a)  for a in [eventtypes , eventindex , AAeventindex , AAeventypes ] ]
             #save each position to event mats
-            col = int(idx[1])
+            col = idx
+
             if len(eventindex)>0:
                 if nucleotide_mutation:
                     nucleotide_mutation  += sparseND.COO( coords =  ( eventindex  , [ col for i in range(len(eventindex)) ]  , eventtypes ) , data = np.ones( len(eventindex) ) , shape = (matsize[0] , matsize[1] , transitionsNT)  )
@@ -207,10 +200,14 @@ def compute_matrices(  resdf  , k , matsize , transitionsNT = 12 , transitionsAA
                     AA_mutation  += sparseND.COO( coords =  (AAeventindex ,  [ col for i in range(len(AAeventindex)) ]   , AAeventypes ) , data = np.ones(len(AAeventindex)  ) , shape = (matsize[0] , matsize[1] , transitionsAA )   )
                 else:
                     AA_mutation  = sparseND.COO( coords =  (AAeventindex ,  [ col for i in range(len(AAeventindex)) ]  , AAeventypes ) , data = np.ones(len(AAeventindex)    ) , shape = (matsize[0] , matsize[1] , transitionsAA )   )
-    return (nucleotide_mutation, AA_mutation)
+
+
+
+    return nucleotide_mutation, AA_mutation
 
 @dask.delayed
 def add_sparsemats(args1, args2):
+
     res=[]
     for i in [0,1]:
         if args1[i] is not None and args2[i]is not None:
@@ -221,7 +218,8 @@ def add_sparsemats(args1, args2):
             res.append(args2[i])
         else:
             res.append(None)
-    return  res
+
+    return res
 
 if __name__ == '__main__':
 
@@ -231,16 +229,16 @@ if __name__ == '__main__':
 
     distributed_computation = True
     if distributed_computation == True:
-        NCORE = 20
-        ncpu = 10
+        NCORE = 10
+        ncpu = 30
         print('deploying cluster')
         cluster = SLURMCluster(
-            walltime='12:00:00',
+            walltime='6:00:00',
             n_workers = NCORE,
             cores=ncpu,
+            processes = ncpu,
             interface='ib0',
-            processes=1,
-            memory="10GB",
+            memory="400GB",
             env_extra=[
             'source /scratch/dmoi/miniconda/etc/profile.d/conda.sh',
             'conda activate ML'
@@ -248,13 +246,16 @@ if __name__ == '__main__':
             scheduler_options={'interface': 'ens2f0' }
         )
 
+
+        print(cluster.job_script())
+
         #cluster.adapt(minimum=40, maximum=NCORE)
-        cluster.scale(10)
+        cluster.scale(30)
         time.sleep(5)
 
         print(cluster)
         print(cluster.dashboard_link)
-        client = Client(cluster , timeout='45s' , set_as_default=True )
+        client = Client(cluster , timeout='450s' , set_as_default=True )
         #client.restart()
     else:
         NCORE = 10
@@ -269,14 +270,17 @@ if __name__ == '__main__':
     bootstrap = .2
     overwrite = False
     #number of replicates
-    bootstrap_replicates = 50
+    bootstrap_replicates = 1
     restart = None
     nucleotides_only = False
 
     blastpath = '/scratch/dmoi/software/ncbi-blast-2.11.0+-src/c++/ReleaseMT/bin/'
 
-    treefile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
-    alnfile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
+    treefile = '/scratch/dmoi/datasets/covid_data/30_may/mmsa_2021-06-01/global.tree'
+    alnfile = '/scratch/dmoi/datasets/covid_data/30_may/mmsa_2021-06-01/2021-06-01_masked.fa'
+
+    #treefile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
+    #alnfile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
 
     #treefile = '../validation_data/16s/16s_salaminWstruct_aln.fasta.treefile'
     #alnfile = '../validation_data/16s/16s_salaminWstruct_aln.fasta'
@@ -471,6 +475,7 @@ if __name__ == '__main__':
     row_index = IDindex
     keep_codons = []
     keep_positions = []
+
     count =0
     print('init blank tree for sankof')
     #init the blank tree
@@ -489,14 +494,18 @@ if __name__ == '__main__':
         l.char= {}
         l.calc = {}
 
-    remote_tree = delayed(pickle.dumps(tree))
-    remote_index = delayed(IDindex)
+
+    remote_tree = client.scatter( lzma.compress(pickle.dumps(tree)) , broadcast=True )
+    remote_index = delayed( IDindex )
     retmatsize = ( len(tree.nodes()) ,daskdf.shape[0]  )
     inlist = []
     coordinates = []
     print(daskdf.shape)
     print(daskdf.head())
-    daskdf = delayed(daskdf)
+
+    #daskdf = delayed(daskdf)
+    #daskdf = dd.from_pandas(daskdf, npartitions= NCORE-1 )
+
 
     print( 'init delayed')
     for k in range(bootstrap_replicates):
@@ -505,21 +514,12 @@ if __name__ == '__main__':
             #####switch to sending the coordinates and masking for the matrix
             for j,codon in enumerate(range(annot_row.qstart-1, annot_row.qend-1 , 3 )):
                 positions = [codon, codon+1 , codon+2]
-                if j% 10 == 0:
-                    print( codon )
-                    print( positions )
-                t = prep_tree( remote_tree , daskdf.loc[positions] , remote_index  )
-                res = calculate_small_parsimony(t,k)
+                res = calculate_small_parsimony( remote_tree , lzma.compress(pickle.dumps(daskdf.loc[positions]))  , remote_index , k  )
                 inlist.append( res )
-                if len(inlist)> NCORE*ncpu:
-                    print('compute')
-                    results = dask.compute(*inlist)
-                    coordinates+= results
-                    inlist = []
-                    print('done')
-
-        matrices = [ delayed(compute_matrices)(df,k, retmatsize) for df in results ]
+        print('done')
+        matrices = [ delayed(compute_matrices)(df,k, retmatsize) for df in inlist ]
         #do binary sum
+
         L = matrices
         while len(L) > 1:
             new_L = []
@@ -530,11 +530,11 @@ if __name__ == '__main__':
                     lazy = L[i]
                 new_L.append(lazy)
             L = new_L
-        sparsemats=[]
-        for m in L:
-            sparsemats.append(m.compute())
+
+        sparsemats = dask.compute(*L)
+        sparsemats = pickle.loads(lzma.decompress(msg))
         print('done')
-        with open( alnfile +'_' + k +'_coevmats.pkl' , 'wb') as coevout:
+        with open( alnfile +'_' + str(k) +'_coevmats.pkl' , 'wb') as coevout:
             print('saving',sparsemats)
             coevout.write(pickle.dumps(sparsemats))
             print('done')

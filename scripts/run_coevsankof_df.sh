@@ -15,4 +15,4 @@
 source /scratch/dmoi/miniconda/etc/profile.d/conda.sh
 conda activate ML
 # Run Jupyter
-python coevsankoff_distributed_dataframe.py
+python coevsankoff_distributed_delayed.py
