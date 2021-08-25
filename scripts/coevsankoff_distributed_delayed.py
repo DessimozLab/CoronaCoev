@@ -58,6 +58,8 @@ def process_node_smallpars_1(node):
                 else:
                     score = min(  [ child.scores[pos][c] for child in node.child_nodes() ] )
                 node.scores[pos][c] = score
+
+                
 def process_node_smallpars_2(node , verbose = False):
     #assign the most parsimonious char from children
     if node.char is None:
