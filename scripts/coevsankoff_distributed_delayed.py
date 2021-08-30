@@ -399,8 +399,6 @@ if __name__ == '__main__':
     print('done')
 
 
-
-
     print('flashing up a dask cluster')
     if distributed_computation == True:
 
