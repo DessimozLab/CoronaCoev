@@ -38,24 +38,21 @@ def prunesamples(samples , sampling ):
     return samples
 
 
-def makesamples( mat , sampling , pow):
+def makesamples( mat , sampling , pow , split =.5 ,nsamples = 1000):
     #generator function to loop through gaf generating samples...
     
     terms = list(index.keys())
     negatives = []
-    print(sum(c.values()))
-    pow = 1.5
-
-    while len(negatives)< 10000000:
+    #pick over represented columns more often in negatives
+    while len(negatives)< int( 2* nsamples * split ):
         neg1 = [ random.choice(terms) for i in range(100000) ]
         neg1 = [ n for n in neg1 if count[n]>0 and random.uniform(0, 1) < sampling[index[n]]**pow and count[n] > 50 ]
         negatives +=neg1
-    #at least 100 annot in corpus
-    thresh = 1
 
-    infinite_gaf = itertools.cycle(gafreader)
+    
+    positives = itertools.cycle(yeildBags)
 
-    for i,dat in enumerate(infinite_gaf):
+    for i,dat in enumerate(positives):
         try:
             #if i == 0:
             #    last =  [  index[s] for s in dat['GO'] if sampling[index[s]]**pow  < random.uniform(0,1) and count[index[s]] > thresh ]
@@ -72,8 +69,9 @@ def makesamples( mat , sampling , pow):
 
                 posi = np.array([  [  c[0] ,c[1]  ]+ [1]  for c in itertools.combinations( samples , 2 )  if  c[0] != c[1] ] )
                 nega = np.array([ [  random.choice(negatives) , random.choice(negatives) ] + [0]  for i in range(posi.shape[0])  ]  )
-
                 samples =  np.vstack([posi,nega])
+
+
                 if samples.shape[1]>1:
                     x1 = samples[:,0]
                     x2 = samples[:,1]
@@ -84,7 +82,89 @@ def makesamples( mat , sampling , pow):
         except ValueError:
             pass
 
-def blurmat( mat , iterations, set_const):
+#load and add bootstraps
+
+treefile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
+alnfile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
+#alnfile = '/scratch/dmoi/datasets/covid_data/msa_0730/msa_0730.fasta'
+#treefile = '/scratch/dmoi/datasets/covid_data/msa_0730/global.tree'
+alnh5 = alnfile+'.h5'
+ts = '2021-08-08T11:16:34.358764'
+#ts = '2021-08-08T14:37:59.736512'
+events = alnfile+'*'+ts+'*'
+eventmats = glob.glob(events)
+nucleotide_mutation = None
+AA_mutation = None
+for mat in eventmats:
+    with open( mat , 'rb') as pklin:
+        mats = pickle.loads(pklin.read())
+        print(mats)
+        if AA_mutation is None:
+            nucleotide_mutation = mats[1]
+            AA_mutation = mats[0]
+        else:
+            nucleotide_mutation += mats[1]
+            AA_mutation += mats[0]
+print(nucleotide_mutation)
+print(AA_mutation)
+
+#load sparse ND array
+from scipy.sparse import coo_matrix
+print(AA_mutation.shape)
+for i in range( AA_mutation.shape[2] ):
+    if i == 0:
+        AAmat =  AA_mutation[:,:,i]
+    else:
+        AAmat +=  AA_mutation[:,:,i]
+        
+
+AAmat = AAmat.to_scipy_sparse()
+
+import sys
+sys.setrecursionlimit(10**6)
+tree = dendropy.Tree.get(
+    path=treefile,
+    schema='newick')
+treelen = tree.length()
+treenodes = len(tree.nodes())
+print('nodes',treenodes)
+print('length',treelen)
+
+
+for i,n in enumerate(tree.nodes()):
+    n.matrow = i
+    n.symbols = None
+    n.scores = None
+    n.event = None
+    n.char = None
+
+matsize = len(tree.nodes())
+print(matsize)
+
+
+print('nodes')
+
+if overwrite_mat or not os.path.exists( alnfile + '_blurmat.pkl'):
+    #blur w connectivity mat
+    connectmat = scipy.sparse.csc_matrix((len(tree.nodes()), len(tree.nodes() ) ) )
+    index = np.array([ [n.matrow, c.matrow ] for n in tree.nodes() for c in n.child_nodes()])
+    lengths = np.array([ c.edge_length for n in tree.nodes() for c in n.child_nodes()])
+    total_len = np.sum(lengths)
+    connectmat[index[:,0],index[:,1]] = 1
+    connectmat[index[:,1],index[:,0]] = 1
+    connectmat = scipy.sparse.coo_matrix(connectmat)
+    #blur matrix
+    for blur in iterations:
+        blurmat += blurmat.dot(connectmat)
+    #generate sampling
+    with open( alnfile + '_blurmat.pkl' , 'wb' ) as matout:
+        matout.write( pickle.dumps(sampling,mat)) 
+else:
+    with open( alnfile + '_blurmat.pkl' , 'rb' ) as matout:
+        sampling,mat = pickle.loads(matout.read() ) 
+
+
+
 
 
 config = tf.ConfigProto()
