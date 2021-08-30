@@ -31,26 +31,29 @@ def yeildBags(mat, samples, pow):
 
 
 def prunesamples(samples , sampling ):
-
     #remove samples in probabilistic way
     #select overrepresented GO terms more often in negative sampling
     ar1 = np.array([ random.uniform(0, 1) > p  for p in [ sampling[ s[0] ] for s in samples ] ] , dtype = np.bool_ )
     ar2 = np.array([ random.uniform(0, 1) > p  for p in [ sampling[ s[0] ] for s in samples ] ] , dtype = np.bool_ )
-    
     select = np.bitwise_and(ar1,ar2)
     samples = np.array(samples)[select,:]
     return samples
 
-def gen_nega(sampling , nnega , pow = .75):
+def yield_nega(sampling , nnega , pow = .75):
+    negatives = []
+    terms = set(sampling.keys())
+
     while len(negatives)< int( 2* nnega ):
         neg1 = [ random.choice(terms) for i in range(nsamples) ]
         neg1 = [ n for n in neg1 if count[n]>0 and random.uniform(0, 1) < sampling[index[n]]**pow ]
         negatives +=neg1
 
-def yield_posi( sampling , mat  ):
 
-    positives = itertools.cycle(yeildBags(mat))
-    while len(negatives)< int( 2* nnega ):
+def yield_posi( sampling , mat , pow = .75 ):
+    cols = itertools.cycle(yeildBags(mat))
+    positives =[]
+    while len(positives)< int( 2* nnega ):
+        
 
 
 def makesamples( mat , sampling , pow= .75 , split =.5 ,nsamples = 1000):
