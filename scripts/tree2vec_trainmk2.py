@@ -13,85 +13,83 @@ from scipy.stats import bernoulli
 import math
 import random
 import pandas as pd
+import scipy
+import dendropy
 import numpy as np
 
 import datetime
 import gzip
 
 import sys
+import copy
 import os
+import glob
+
+import pdb
 
 def yeildBags(mat, samples, pow):
-  #
   nzrows = list( np.where( mat.sum( axis = 1 ) > 0 )[1] )
   for row in nzrows:
     index = np.argwhere( mat[row,:] )[1]
-    yield  index , mat[row, index]  
-  return cols
-
-
-def prunesamples(samples , sampling ):
-    #remove samples in probabilistic way
-    #select overrepresented GO terms more often in negative sampling
-    ar1 = np.array([ random.uniform(0, 1) > p  for p in [ sampling[ s[0] ] for s in samples ] ] , dtype = np.bool_ )
-    ar2 = np.array([ random.uniform(0, 1) > p  for p in [ sampling[ s[0] ] for s in samples ] ] , dtype = np.bool_ )
-    select = np.bitwise_and(ar1,ar2)
-    samples = np.array(samples)[select,:]
-    return samples
+    yield  index , mat[row, index] 
 
 def yield_nega(sampling , nnega , pow = .75):
     negatives = []
     terms = set(sampling.keys())
-
-    while len(negatives)< int( 2* nnega ):
+    while True:
         neg1 = [ random.choice(terms) for i in range(nsamples) ]
         neg1 = [ n for n in neg1 if count[n]>0 and random.uniform(0, 1) < sampling[index[n]]**pow ]
-        negatives +=neg1
+        if len(neg1)%2 == 1:
+            neg1 = neg1[:-1]
+
+        neg2 = neg1[0:int(len(neg1)/2)]
+        neg1 = neg1[int(len(neg1)/2):]
+        yield np.hstack( [neg1,neg2])
 
 
-def yield_posi( sampling , mat , pow = .75 ):
+def yield_posi( sampling , mat , nposi  ):
     cols = itertools.cycle(yeildBags(mat))
-    positives =[]
-    while len(positives)< int( 2* nnega ):
-        
+    positives =None
+    while True:
+        index , matrow  = next(cols)
+        colvalues = dict(zip(list(index), list(matrow) ) )
+        #sample as a function of the event confidence
+        pairs = [[c[0],c[1]] for i,c in enumerate(itertools.combinations(colvalues.keys())) if i < nposi ]
+        ar1 = np.array([ random.uniform(0, np.amax(matrow)) < colvalues[ pair[0] ] for pair in pairs ] , dtype = np.bool_ )
+        ar2 = np.array([ random.uniform(0, np.amax(matrow)) < colvalues[ pair[1] ] for pair in pairs ] , dtype = np.bool_ )
+        select = np.bitwise_and(ar1,ar2)
+        if positives:
+            posi = np.array(colvalues)[select,:]
+            positives = np.vstack( [posi, positives])
+        else:
+            positives = np.array(posi)
+        if positives.shape[1]> nposi:
+            yield positives
+            positives = None
 
-
-def makesamples( mat , sampling , pow= .75 , split =.5 ,nsamples = 1000):
-    #generator function to loop through gaf generating samples...
-    
+def yield_samples( mat , sampling , pow= .75 , split =.5 ,nsamples = 1000):
     terms = list(index.keys())
-    negatives = []
     #pick over represented columns more often in negatives
+    while True:
+        nega = yield_nega(sampling , nnega , pow = .75 )
+        posi = yield_posi( sampling , mat , nposi  )
+        samples = np.vstack(posi, nega)
+        labels = np.vstack( np.ones(posi.shape[1]) , np.zeros(nega.shape[1]) )
+        x1 = samples[:,0]
+        x2 = samples[:,1]
+        y = samples[:,2]
+        yield [x1,x2],y 
+
+def make_sampling( mat , z =.001 , pow = 2 ):
+    #proba of keeping a column in neg samples
+    sumv = mat.sum(axis = 0) 
+    nonzero = np.argwhere( sumv )[:,1]
+    sumv = sumv[0,nonzero]
+    sumv = np.multiply(np.power( sumv , pow ) +1 , z/sumv ) 
     
 
-    
+    return dict(zip( list(nonzero), list(sumv.flat)))
 
-
-
-    for i,dat in enumerate(positives):
-                samples = []
-                maxiter = 100
-                i = 0
-                while len(samples) <1 and i < maxiter:
-                    #favor less common words
-                    samples =  [  index[s] for s in dat['GO'] if s in index and sampling[index[s]] > random.uniform(0,1)  and  count[s] > 20  ]
-                    i += 1
-                if i == maxiter:
-                    samples =  [  index[s] for s in dat['GO'] if s in index ]
-
-                posi = np.array([  [  c[0] ,c[1]  ]+ [1]  for c in itertools.combinations( samples , 2 )  if  c[0] != c[1] ] )
-                samples =  np.vstack([posi,nega])
-
-
-                if samples.shape[1]>1:
-                    x1 = samples[:,0]
-                    x2 = samples[:,1]
-                    y = samples[:,2]
-                    yield [x1,x2],y
-            else:
-                pass
-        except ValueError:
-            pass
 
 #load and add bootstraps
 
@@ -102,6 +100,8 @@ alnfile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter
 alnh5 = alnfile+'.h5'
 ts = '2021-08-08T11:16:34.358764'
 #ts = '2021-08-08T14:37:59.736512'
+overwrite_mat = True
+blur_iterations = 50
 
 
 if overwrite_mat or not os.path.exists( alnfile + '_blurmat.pkl'):
@@ -132,10 +132,7 @@ if overwrite_mat or not os.path.exists( alnfile + '_blurmat.pkl'):
             AAmat =  AA_mutation[:,:,i]
         else:
             AAmat +=  AA_mutation[:,:,i]
-            
-
     AAmat = AAmat.to_scipy_sparse()
-
     sys.setrecursionlimit(10**6)
     tree = dendropy.Tree.get(
         path=treefile,
@@ -146,38 +143,37 @@ if overwrite_mat or not os.path.exists( alnfile + '_blurmat.pkl'):
     print('length',treelen)
     for i,n in enumerate(tree.nodes()):
         n.matrow = i
-        n.symbols = None
-        n.scores = None
-        n.event = None
-        n.char = None
     matsize = len(tree.nodes())
     print(matsize)
     connectmat = scipy.sparse.csc_matrix((len(tree.nodes()), len(tree.nodes() ) ) )
     index = np.array([ [n.matrow, c.matrow ] for n in tree.nodes() for c in n.child_nodes()])
-    lengths = np.array([ c.edge_length for n in tree.nodes() for c in n.child_nodes()])
-    total_len = np.sum(lengths)
-    connectmat[index[:,0],index[:,1]] = 1
-    connectmat[index[:,1],index[:,0]] = 1
+    #lengths = np.array([ c.edge_length for n in tree.nodes() for c in n.child_nodes()])
+    #total_len = np.sum(lengths)
+    blurfactor = .25
+    connectmat[index[:,0],index[:,1]] = blurfactor
+    connectmat[index[:,1],index[:,0]] = blurfactor
     connectmat = scipy.sparse.coo_matrix(connectmat)
     #blur matrix
-    for blur in iterations:
-        blurmat += blurmat.dot(connectmat)
+    
+    blurmat = copy.deepcopy(AAmat)
+    for blur in range(blur_iterations):
+        blurmat += connectmat.dot(blurmat)
+
     #generate sampling
+    sampling = make_sampling( blurmat )
+
     with open( alnfile + '_blurmat.pkl' , 'wb' ) as matout:
-        matout.write( pickle.dumps(sampling,mat)) 
+        matout.write( pickle.dumps([sampling,blurmat])) 
 else:
     with open( alnfile + '_blurmat.pkl' , 'rb' ) as matout:
-        sampling,mat = pickle.loads(matout.read() ) 
+        sampling,blurmat = pickle.loads(matout.read() ) 
 
-
-
-
-
-config = tf.ConfigProto()
-config.gpu_options.per_process_gpu_memory_fraction= 0.95
-K.set_session(tf.Session(config=config))
 
 #filter the index
+print(sampling)
+
+
+
 nterms = len(index)
 
 if retrain == False:
@@ -216,31 +212,6 @@ if retrain == False:
     embedder = Model( inputs=[input_target], output=target )
     validation_model = Model(input=[input_target, input_context], output=similarity)
 
-    class SimilarityCallback:
-        def run_sim(self):
-            for i in range(valid_size):
-                valid_word = reverse_dictionary[valid_examples[i]]
-                top_k = 8  # number of nearest neighbors
-                sim = self._get_sim(valid_examples[i])
-                nearest = (-sim).argsort()[1:top_k + 1]
-                log_str = 'Nearest to %s:' % valid_word
-                for k in range(top_k):
-                    close_word = reverse_dictionary[nearest[k]]
-                    log_str = '%s %s,' % (log_str, close_word)
-                print(log_str)
-
-        @staticmethod
-        def _get_sim(valid_word_idx):
-            sim = np.zeros((vocab_size,))
-            in_arr1 = np.zeros((1,))
-            in_arr2 = np.zeros((1,))
-            for i in range(vocab_size):
-                in_arr1[0,] = valid_word_idx
-                in_arr2[0,] = i
-                out = validation_model.predict_on_batch([in_arr1, in_arr2])
-                sim[i] = out
-            return sim
-    sim_cb = SimilarityCallback()
     ###modify this
     batchiter = 10000
     epochs = 100
