@@ -18,7 +18,8 @@ import numpy as np
 import datetime
 import gzip
 
-
+import sys
+import os
 
 def yeildBags(mat, samples, pow):
   #
@@ -30,33 +31,41 @@ def yeildBags(mat, samples, pow):
 
 
 def prunesamples(samples , sampling ):
+
     #remove samples in probabilistic way
     #select overrepresented GO terms more often in negative sampling
-    #ar1 = np.array([ random.uniform(0, 1) > p  for p in [ sampling[ s[0] ] for s in samples ] ] , dtype = np.bool_ )
+    ar1 = np.array([ random.uniform(0, 1) > p  for p in [ sampling[ s[0] ] for s in samples ] ] , dtype = np.bool_ )
+    ar2 = np.array([ random.uniform(0, 1) > p  for p in [ sampling[ s[0] ] for s in samples ] ] , dtype = np.bool_ )
+    
     select = np.bitwise_and(ar1,ar2)
     samples = np.array(samples)[select,:]
     return samples
 
+def gen_nega(sampling , nnega , pow = .75):
+    while len(negatives)< int( 2* nnega ):
+        neg1 = [ random.choice(terms) for i in range(nsamples) ]
+        neg1 = [ n for n in neg1 if count[n]>0 and random.uniform(0, 1) < sampling[index[n]]**pow ]
+        negatives +=neg1
 
-def makesamples( mat , sampling , pow , split =.5 ,nsamples = 1000):
+def yield_posi( sampling , mat  ):
+
+    positives = itertools.cycle(yeildBags(mat))
+    while len(negatives)< int( 2* nnega ):
+
+
+def makesamples( mat , sampling , pow= .75 , split =.5 ,nsamples = 1000):
     #generator function to loop through gaf generating samples...
     
     terms = list(index.keys())
     negatives = []
     #pick over represented columns more often in negatives
-    while len(negatives)< int( 2* nsamples * split ):
-        neg1 = [ random.choice(terms) for i in range(100000) ]
-        neg1 = [ n for n in neg1 if count[n]>0 and random.uniform(0, 1) < sampling[index[n]]**pow and count[n] > 50 ]
-        negatives +=neg1
+    
 
     
-    positives = itertools.cycle(yeildBags)
+
+
 
     for i,dat in enumerate(positives):
-        try:
-            #if i == 0:
-            #    last =  [  index[s] for s in dat['GO'] if sampling[index[s]]**pow  < random.uniform(0,1) and count[index[s]] > thresh ]
-            if len(dat['GO'])>1 and i > 0:
                 samples = []
                 maxiter = 100
                 i = 0
@@ -68,7 +77,6 @@ def makesamples( mat , sampling , pow , split =.5 ,nsamples = 1000):
                     samples =  [  index[s] for s in dat['GO'] if s in index ]
 
                 posi = np.array([  [  c[0] ,c[1]  ]+ [1]  for c in itertools.combinations( samples , 2 )  if  c[0] != c[1] ] )
-                nega = np.array([ [  random.choice(negatives) , random.choice(negatives) ] + [0]  for i in range(posi.shape[0])  ]  )
                 samples =  np.vstack([posi,nega])
 
 
@@ -91,61 +99,56 @@ alnfile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter
 alnh5 = alnfile+'.h5'
 ts = '2021-08-08T11:16:34.358764'
 #ts = '2021-08-08T14:37:59.736512'
-events = alnfile+'*'+ts+'*'
-eventmats = glob.glob(events)
-nucleotide_mutation = None
-AA_mutation = None
-for mat in eventmats:
-    with open( mat , 'rb') as pklin:
-        mats = pickle.loads(pklin.read())
-        print(mats)
-        if AA_mutation is None:
-            nucleotide_mutation = mats[1]
-            AA_mutation = mats[0]
-        else:
-            nucleotide_mutation += mats[1]
-            AA_mutation += mats[0]
-print(nucleotide_mutation)
-print(AA_mutation)
 
-#load sparse ND array
-from scipy.sparse import coo_matrix
-print(AA_mutation.shape)
-for i in range( AA_mutation.shape[2] ):
-    if i == 0:
-        AAmat =  AA_mutation[:,:,i]
-    else:
-        AAmat +=  AA_mutation[:,:,i]
-        
-
-AAmat = AAmat.to_scipy_sparse()
-
-import sys
-sys.setrecursionlimit(10**6)
-tree = dendropy.Tree.get(
-    path=treefile,
-    schema='newick')
-treelen = tree.length()
-treenodes = len(tree.nodes())
-print('nodes',treenodes)
-print('length',treelen)
-
-
-for i,n in enumerate(tree.nodes()):
-    n.matrow = i
-    n.symbols = None
-    n.scores = None
-    n.event = None
-    n.char = None
-
-matsize = len(tree.nodes())
-print(matsize)
-
-
-print('nodes')
 
 if overwrite_mat or not os.path.exists( alnfile + '_blurmat.pkl'):
     #blur w connectivity mat
+
+    events = alnfile+'*'+ts+'*'
+    eventmats = glob.glob(events)
+    nucleotide_mutation = None
+    AA_mutation = None
+    for mat in eventmats:
+        with open( mat , 'rb') as pklin:
+            mats = pickle.loads(pklin.read())
+            print(mats)
+            if AA_mutation is None:
+                nucleotide_mutation = mats[1]
+                AA_mutation = mats[0]
+            else:
+                nucleotide_mutation += mats[1]
+                AA_mutation += mats[0]
+    print(nucleotide_mutation)
+    print(AA_mutation)
+
+    #load sparse ND array
+    from scipy.sparse import coo_matrix
+    print(AA_mutation.shape)
+    for i in range( AA_mutation.shape[2] ):
+        if i == 0:
+            AAmat =  AA_mutation[:,:,i]
+        else:
+            AAmat +=  AA_mutation[:,:,i]
+            
+
+    AAmat = AAmat.to_scipy_sparse()
+
+    sys.setrecursionlimit(10**6)
+    tree = dendropy.Tree.get(
+        path=treefile,
+        schema='newick')
+    treelen = tree.length()
+    treenodes = len(tree.nodes())
+    print('nodes',treenodes)
+    print('length',treelen)
+    for i,n in enumerate(tree.nodes()):
+        n.matrow = i
+        n.symbols = None
+        n.scores = None
+        n.event = None
+        n.char = None
+    matsize = len(tree.nodes())
+    print(matsize)
     connectmat = scipy.sparse.csc_matrix((len(tree.nodes()), len(tree.nodes() ) ) )
     index = np.array([ [n.matrow, c.matrow ] for n in tree.nodes() for c in n.child_nodes()])
     lengths = np.array([ c.edge_length for n in tree.nodes() for c in n.child_nodes()])
