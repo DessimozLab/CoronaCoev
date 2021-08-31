@@ -27,37 +27,43 @@ import glob
 
 import pdb
 
-def yeildBags(mat, samples, pow):
-  nzrows = list( np.where( mat.sum( axis = 1 ) > 0 )[1] )
+def yeildBags( mat ):
+  nzrows = list( np.where( mat.sum( axis = 1 ) > 0 )[0])
   for row in nzrows:
-    index = np.argwhere( mat[row,:] )[1]
-    yield  index , mat[row, index] 
+    index = np.argwhere( mat[row,:] )[0]
+    
+    print(index)
+    
+    yield  index , mat[row, index]
 
-def yield_nega(sampling , nnega , pow = .75):
+def yield_nega( sampling , nnega , pow = .75 ):
     negatives = []
     terms = set(sampling.keys())
     while True:
         neg1 = [ random.choice(terms) for i in range(nsamples) ]
-        neg1 = [ n for n in neg1 if count[n]>0 and random.uniform(0, 1) < sampling[index[n]]**pow ]
+        neg1 = [ n for n in neg1 if count[n]>0 and random.uniform(0, 1) < sampling[index[n]] ]
         if len(neg1)%2 == 1:
             neg1 = neg1[:-1]
-
         neg2 = neg1[0:int(len(neg1)/2)]
         neg1 = neg1[int(len(neg1)/2):]
         yield np.hstack( [neg1,neg2])
 
 
 def yield_posi( sampling , mat , nposi  ):
-    cols = itertools.cycle(yeildBags(mat))
+    cols = itertools.cycle(yeildBags(mat ) )
     positives =None
     while True:
         index , matrow  = next(cols)
         colvalues = dict(zip(list(index), list(matrow) ) )
         #sample as a function of the event confidence
-        pairs = [[c[0],c[1]] for i,c in enumerate(itertools.combinations(colvalues.keys())) if i < nposi ]
-        ar1 = np.array([ random.uniform(0, np.amax(matrow)) < colvalues[ pair[0] ] for pair in pairs ] , dtype = np.bool_ )
-        ar2 = np.array([ random.uniform(0, np.amax(matrow)) < colvalues[ pair[1] ] for pair in pairs ] , dtype = np.bool_ )
+        pairs = [[c[0],c[1]] for i,c in enumerate( itertools.combinations(colvalues.keys() , 2 ) ) if i < nposi ]
+        ar1 = np.array([ random.uniform(0, np.amax(matrow)) < sampling[ pair[0] ] * colvalues[ pair[0] ] for pair in pairs ] , dtype = np.bool_ )
+        ar2 = np.array([ random.uniform(0, np.amax(matrow)) < sampling[ pair[1] ] * colvalues[ pair[1] ] for pair in pairs ] , dtype = np.bool_ )
         select = np.bitwise_and(ar1,ar2)
+        
+        posi = np.array(colvalues)
+        posi = posi[select,:]
+
         if positives:
             posi = np.array(colvalues)[select,:]
             positives = np.vstack( [posi, positives])
@@ -68,26 +74,36 @@ def yield_posi( sampling , mat , nposi  ):
             positives = None
 
 def yield_samples( mat , sampling , pow= .75 , split =.5 ,nsamples = 1000):
-    terms = list(index.keys())
+    terms = list(sampling.keys())
     #pick over represented columns more often in negatives
+    
+    nnega = int(nsamples*split)
+    nposi = int(nsamples*(1-split))
+    negagen = yield_nega(sampling , nnega , pow = .75 )
+    posigen = yield_posi( sampling , mat , nposi  )
+
     while True:
-        nega = yield_nega(sampling , nnega , pow = .75 )
-        posi = yield_posi( sampling , mat , nposi  )
-        samples = np.vstack(posi, nega)
+
+        posi = next( posigen )
+        nega = next( negagen )
+      
+        samples = np.vstack([posi, nega])
+        
+        print(samples)
         labels = np.vstack( np.ones(posi.shape[1]) , np.zeros(nega.shape[1]) )
+        samples = np.hstack([ samples, labels ])
         x1 = samples[:,0]
         x2 = samples[:,1]
         y = samples[:,2]
         yield [x1,x2],y 
 
-def make_sampling( mat , z =.001 , pow = 2 ):
+def make_neg_sampling( mat , z =.01 , pow = .75 ):
     #proba of keeping a column in neg samples
     sumv = mat.sum(axis = 0) 
     nonzero = np.argwhere( sumv )[:,1]
     sumv = sumv[0,nonzero]
-    sumv = np.multiply(np.power( sumv , pow ) +1 , z/sumv ) 
-    
-
+    sumv = np.multiply( np.power( sumv / z , pow ) +1 , z / sumv ) 
+    sumv = sumv/np.amax(sumv)
     return dict(zip( list(nonzero), list(sumv.flat)))
 
 
@@ -101,6 +117,8 @@ alnh5 = alnfile+'.h5'
 ts = '2021-08-08T11:16:34.358764'
 #ts = '2021-08-08T14:37:59.736512'
 overwrite_mat = True
+retrain = True
+
 blur_iterations = 50
 
 
@@ -160,7 +178,7 @@ if overwrite_mat or not os.path.exists( alnfile + '_blurmat.pkl'):
         blurmat += connectmat.dot(blurmat)
 
     #generate sampling
-    sampling = make_sampling( blurmat )
+    sampling = make_neg_sampling( blurmat )
 
     with open( alnfile + '_blurmat.pkl' , 'wb' ) as matout:
         matout.write( pickle.dumps([sampling,blurmat])) 
@@ -171,10 +189,14 @@ else:
 
 #filter the index
 print(sampling)
-
-
-
 nterms = len(index)
+
+samplegen = yield_samples( blurmat , sampling , pow= .75 , split =.5 ,nsamples = 1000)
+
+print(next(samplegen))
+
+
+
 
 if retrain == False:
     #dimensionality of GO space
