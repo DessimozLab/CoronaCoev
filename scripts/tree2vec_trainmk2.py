@@ -29,12 +29,12 @@ import pdb
 
 def yeildBags( mat ):
   nzrows = list( np.where( mat.sum( axis = 1 ) > 0 )[0])
+
   for row in nzrows:
-    index = np.argwhere( mat[row,:] )[0]
-    
-    print(index)
-    
-    yield  index , mat[row, index]
+    index = np.argwhere( mat[row,:] )
+    if index.shape[0]>1:
+        index = list(index[:,1])
+        yield  index , [ v for v in mat[row, index].todense().flat ] , row
 
 def yield_nega( sampling , nnega , pow = .75 ):
     negatives = []
@@ -49,29 +49,54 @@ def yield_nega( sampling , nnega , pow = .75 ):
         yield np.hstack( [neg1,neg2])
 
 
-def yield_posi( sampling , mat , nposi  ):
+def yield_posi( sampling , mat , nposi  , iter_row= 10 , itermax = 100,  fancy = False, verbose = True):
     cols = itertools.cycle(yeildBags(mat ) )
     positives =None
-    while True:
-        index , matrow  = next(cols)
-        colvalues = dict(zip(list(index), list(matrow) ) )
-        #sample as a function of the event confidence
-        pairs = [[c[0],c[1]] for i,c in enumerate( itertools.combinations(colvalues.keys() , 2 ) ) if i < nposi ]
-        ar1 = np.array([ random.uniform(0, np.amax(matrow)) < sampling[ pair[0] ] * colvalues[ pair[0] ] for pair in pairs ] , dtype = np.bool_ )
-        ar2 = np.array([ random.uniform(0, np.amax(matrow)) < sampling[ pair[1] ] * colvalues[ pair[1] ] for pair in pairs ] , dtype = np.bool_ )
-        select = np.bitwise_and(ar1,ar2)
-        
-        posi = np.array(colvalues)
-        posi = posi[select,:]
 
-        if positives:
-            posi = np.array(colvalues)[select,:]
-            positives = np.vstack( [posi, positives])
+    while True:
+    
+        index , matrow , rownum = next(cols)
+        pairs = [[c[0],c[1]] for i,c in enumerate( itertools.combinations( index , 2 ) )  ]
+
+        if fancy == True:
+            #balance prob of event w sampling ( more for columns that dont show up often )
+            #prob needs something a bit fancier here to reflect the overall amount of events
+            matrow = np.multiply(  matrow , [ 1- sampling[i] for i in index ] )
+            matrow /= np.amax(matrow)            
         else:
-            positives = np.array(posi)
-        if positives.shape[1]> nposi:
-            yield positives
-            positives = None
+        #proportional to the highest proba
+            matrow /= np.amax(matrow)
+
+        #sample in each row a few times
+        if verbose == True:
+            print(rownum)
+
+        for k in range(iter_row):
+            iterations = 0
+            while True:
+                colvalues = dict(zip(list(index), matrow ) )
+                #sample as a function of the event confidence and sampling
+                ar1 = np.array([ random.uniform(0, 1) <  colvalues[ pair[0] ] for pair in pairs ] , dtype = np.bool_ )
+                ar2 = np.array([ random.uniform(0, 1) <  colvalues[ pair[1] ] for pair in pairs ] , dtype = np.bool_ )
+                select = np.bitwise_and(ar1,ar2)
+                iterations +=1
+                if select.any() or iterations > itermax:
+                    break
+
+            if select.any():
+                posi = np.array(pairs)
+                posi = posi[select,:]
+                if verbose == True:
+                    print(posi, posi.shape , select)
+                if positives is not None:
+                    positives = np.vstack( [posi, positives])
+                else:
+                    positives = np.array(posi)
+                if positives.shape[1] > nposi:
+                    yield positives
+                    positives = None
+        
+
 
 def yield_samples( mat , sampling , pow= .75 , split =.5 ,nsamples = 1000):
     terms = list(sampling.keys())
@@ -116,7 +141,7 @@ alnfile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter
 alnh5 = alnfile+'.h5'
 ts = '2021-08-08T11:16:34.358764'
 #ts = '2021-08-08T14:37:59.736512'
-overwrite_mat = True
+overwrite_mat = False
 retrain = True
 
 blur_iterations = 50
@@ -141,6 +166,7 @@ if overwrite_mat or not os.path.exists( alnfile + '_blurmat.pkl'):
                 AA_mutation += mats[0]
     print(nucleotide_mutation)
     print(AA_mutation)
+    AA_mutation/=len(eventmats)
 
     #load sparse ND array
     from scipy.sparse import coo_matrix
@@ -187,10 +213,7 @@ else:
         sampling,blurmat = pickle.loads(matout.read() ) 
 
 
-#filter the index
-print(sampling)
-nterms = len(index)
-
+nterms = len(sampling)
 samplegen = yield_samples( blurmat , sampling , pow= .75 , split =.5 ,nsamples = 1000)
 
 print(next(samplegen))
