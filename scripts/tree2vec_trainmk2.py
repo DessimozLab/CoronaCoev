@@ -16,47 +16,45 @@ import pandas as pd
 import scipy
 import dendropy
 import numpy as np
-
 import datetime
 import gzip
-
 import sys
 import copy
 import os
 import glob
-
 import pdb
 
 def yeildBags( mat ):
   nzrows = list( np.where( mat.sum( axis = 1 ) > 0 )[0])
-
   for row in nzrows:
     index = np.argwhere( mat[row,:] )
     if index.shape[0]>1:
         index = list(index[:,1])
-        yield  index , [ v for v in mat[row, index].todense().flat ] , row
+        yield  index , mat[row,:].todense() , row
 
 def yield_nega( sampling , nnega , pow = .75 ):
     negatives = []
-    terms = set(sampling.keys())
+    terms = list(sampling.keys())
     while True:
-        neg1 = [ random.choice(terms) for i in range(nsamples) ]
-        neg1 = [ n for n in neg1 if count[n]>0 and random.uniform(0, 1) < sampling[index[n]] ]
+        neg1 = [ random.choice(terms) for i in range(int(2 * nnega)) ]
+        neg1 = [ n for n in neg1 if random.uniform(0, 1) < sampling[n]]
         if len(neg1)%2 == 1:
             neg1 = neg1[:-1]
-        neg2 = neg1[0:int(len(neg1)/2)]
-        neg1 = neg1[int(len(neg1)/2):]
-        yield np.hstack( [neg1,neg2])
+        neg2 = np.array(neg1[0:int(len(neg1)/2)])
+        neg1 = np.array(neg1[int(len(neg1)/2):])
+        ret = np.vstack( [neg1,neg2] ).T
 
+        yield ret
 
 def yield_posi( sampling , mat , nposi  , iter_row= 10 , itermax = 100,  fancy = False, verbose = True):
     cols = itertools.cycle(yeildBags(mat ) )
     positives =None
-
     while True:
-    
         index , matrow , rownum = next(cols)
-        pairs = [[c[0],c[1]] for i,c in enumerate( itertools.combinations( index , 2 ) )  ]
+        pairs = np.array([[c[0],c[1]] for i,c in enumerate( itertools.combinations( index , 2 ) )  ] )
+        vals= dict( zip( index, [ p for p in matrow[0,index].flat] ) )
+        print(pairs)
+        pairvalues = np.vectorize(vals.get)(pairs)
 
         if fancy == True:
             #balance prob of event w sampling ( more for columns that dont show up often )
@@ -66,23 +64,20 @@ def yield_posi( sampling , mat , nposi  , iter_row= 10 , itermax = 100,  fancy =
         else:
         #proportional to the highest proba
             matrow /= np.amax(matrow)
-
         #sample in each row a few times
         if verbose == True:
             print(rownum)
-
         for k in range(iter_row):
             iterations = 0
             while True:
-                colvalues = dict(zip(list(index), matrow ) )
                 #sample as a function of the event confidence and sampling
-                ar1 = np.array([ random.uniform(0, 1) <  colvalues[ pair[0] ] for pair in pairs ] , dtype = np.bool_ )
-                ar2 = np.array([ random.uniform(0, 1) <  colvalues[ pair[1] ] for pair in pairs ] , dtype = np.bool_ )
-                select = np.bitwise_and(ar1,ar2)
+                rand = np.random.uniform(low=0.0, high=1.0, size= pairvalues.shape[0] )
+                ar1 = np.array( rand <  pairvalues[:,0]  , dtype = np.bool_ )
+                ar2 = np.array( rand <  pairvalues[:,1] , dtype = np.bool_ )
+                select = np.bitwise_and(ar1 ,ar2 )
                 iterations +=1
                 if select.any() or iterations > itermax:
                     break
-
             if select.any():
                 posi = np.array(pairs)
                 posi = posi[select,:]
@@ -92,7 +87,7 @@ def yield_posi( sampling , mat , nposi  , iter_row= 10 , itermax = 100,  fancy =
                     positives = np.vstack( [posi, positives])
                 else:
                     positives = np.array(posi)
-                if positives.shape[1] > nposi:
+                if positives.shape[0] > nposi:
                     yield positives
                     positives = None
         
@@ -104,22 +99,24 @@ def yield_samples( mat , sampling , pow= .75 , split =.5 ,nsamples = 1000):
     
     nnega = int(nsamples*split)
     nposi = int(nsamples*(1-split))
-    negagen = yield_nega(sampling , nnega , pow = .75 )
+    
+    negagen = yield_nega(sampling , nnega , pow = .75)
+
     posigen = yield_posi( sampling , mat , nposi  )
-
+    
     while True:
-
         posi = next( posigen )
         nega = next( negagen )
-      
         samples = np.vstack([posi, nega])
-        
         print(samples)
-        labels = np.vstack( np.ones(posi.shape[1]) , np.zeros(nega.shape[1]) )
+
+        labels = np.vstack( [np.ones((posi.shape[0],1)) , np.zeros((nega.shape[0],1))] )
+        
         samples = np.hstack([ samples, labels ])
         x1 = samples[:,0]
         x2 = samples[:,1]
         y = samples[:,2]
+
         yield [x1,x2],y 
 
 def make_neg_sampling( mat , z =.01 , pow = .75 ):
