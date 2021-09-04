@@ -23,9 +23,23 @@ import copy
 import os
 import glob
 import pdb
+import random
+import tensorflow as tf
+from tensorflow.compat.v1 import ConfigProto
+from tensorflow.compat.v1 import InteractiveSession
+from tensorflow.compat.v1.keras import backend as K
+
+config = ConfigProto()
+config.gpu_options.allow_growth = True
+config.gpu_options.per_process_gpu_memory_fraction= 0.95
+tf.compat.v1.keras.backend.set_session(tf.compat.v1.Session(config=config) )
+
 
 def yeildBags( mat ):
   nzrows = list( np.where( mat.sum( axis = 1 ) > 0 )[0])
+  random.shuffle(nzrows)
+  #shuffle row order
+
   for row in nzrows:
     index = np.argwhere( mat[row,:] )
     if index.shape[0]>1:
@@ -43,19 +57,16 @@ def yield_nega( sampling , nnega , pow = .75 ):
         neg2 = np.array(neg1[0:int(len(neg1)/2)])
         neg1 = np.array(neg1[int(len(neg1)/2):])
         ret = np.vstack( [neg1,neg2] ).T
-
         yield ret
 
-def yield_posi( sampling , mat , nposi  , iter_row= 10 , itermax = 100,  fancy = False, verbose = True):
+def yield_posi( sampling , mat , nposi  , iter_row= 10 , itermax = 100,  fancy = False, verbose = False):
     cols = itertools.cycle(yeildBags(mat ) )
     positives =None
     while True:
         index , matrow , rownum = next(cols)
         pairs = np.array([[c[0],c[1]] for i,c in enumerate( itertools.combinations( index , 2 ) )  ] )
         vals= dict( zip( index, [ p for p in matrow[0,index].flat] ) )
-        print(pairs)
         pairvalues = np.vectorize(vals.get)(pairs)
-
         if fancy == True:
             #balance prob of event w sampling ( more for columns that dont show up often )
             #prob needs something a bit fancier here to reflect the overall amount of events
@@ -91,33 +102,26 @@ def yield_posi( sampling , mat , nposi  , iter_row= 10 , itermax = 100,  fancy =
                     yield positives
                     positives = None
         
-
-
-def yield_samples( mat , sampling , pow= .75 , split =.5 ,nsamples = 1000):
+def yield_samples( mat , sampling , pow= .75 , split =.75 ,nsamples = 1000):
     terms = list(sampling.keys())
+    index = dict( zip( sampling.keys(), range(len(sampling.keys()))))
     #pick over represented columns more often in negatives
-    
     nnega = int(nsamples*split)
     nposi = int(nsamples*(1-split))
-    
-    negagen = yield_nega(sampling , nnega , pow = .75)
 
-    posigen = yield_posi( sampling , mat , nposi  )
-    
+    negagen = yield_nega(sampling , nnega , pow = .75)
+    posigen = yield_posi( sampling , mat , nposi  )    
     while True:
         posi = next( posigen )
         nega = next( negagen )
         samples = np.vstack([posi, nega])
-        print(samples)
-
+        samples = np.vectorize(index.get)(samples)
         labels = np.vstack( [np.ones((posi.shape[0],1)) , np.zeros((nega.shape[0],1))] )
-        
         samples = np.hstack([ samples, labels ])
         x1 = samples[:,0]
         x2 = samples[:,1]
         y = samples[:,2]
-
-        yield [x1,x2],y 
+        yield [x1,x2],y
 
 def make_neg_sampling( mat , z =.01 , pow = .75 ):
     #proba of keeping a column in neg samples
@@ -136,10 +140,14 @@ alnfile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter
 #alnfile = '/scratch/dmoi/datasets/covid_data/msa_0730/msa_0730.fasta'
 #treefile = '/scratch/dmoi/datasets/covid_data/msa_0730/global.tree'
 alnh5 = alnfile+'.h5'
+
+
+modelfile = alnfile + 'embeddingTF.h5'
+
 ts = '2021-08-08T11:16:34.358764'
 #ts = '2021-08-08T14:37:59.736512'
 overwrite_mat = False
-retrain = True
+retrain = False
 
 blur_iterations = 50
 
@@ -195,7 +203,6 @@ if overwrite_mat or not os.path.exists( alnfile + '_blurmat.pkl'):
     connectmat[index[:,1],index[:,0]] = blurfactor
     connectmat = scipy.sparse.coo_matrix(connectmat)
     #blur matrix
-    
     blurmat = copy.deepcopy(AAmat)
     for blur in range(blur_iterations):
         blurmat += connectmat.dot(blurmat)
@@ -211,53 +218,37 @@ else:
 
 
 nterms = len(sampling)
-samplegen = yield_samples( blurmat , sampling , pow= .75 , split =.5 ,nsamples = 1000)
 
+
+samplegen = yield_samples( blurmat , sampling , pow= .75 , split =.75 ,nsamples = 10000)
+print(nterms)
+vector_dim = 10
 print(next(samplegen))
-
-
-
-
-if retrain == False:
-    #dimensionality of GO space
-    vector_dim = 5
+if retrain == False:    
     #word2vec model to be trained
     input_target = Input((1,) , name='target_in')
     input_context = Input((1,) , name='context_in')
-
-    embedding = Embedding(nterms, vector_dim, input_length=1, name='embedding' , embeddings_initializer='uniform', embeddings_regularizer= None,
-     activity_regularizer=None, embeddings_constraint=None, mask_zero=False )
-
+    embedding = Embedding( nterms, vector_dim, input_length=1, name='embedding' , embeddings_initializer='glorot_uniform' )
     target = embedding(input_target)
     target = Reshape((vector_dim, 1), name='target')(target)
+
     context = embedding(input_context)
     context = Reshape((vector_dim, 1) , name='context' )(context)
-    similarity = dot([target, context], axes=0 , normalize = True )
-    # now perform the dot product operation to get a similarity measure
-    dot_product = dot([target, context] , axes=1)
+
+    dot_product = dot([target, context] , axes=1 , normalize = False)
     dot_product = Reshape((1,))(dot_product)
+
 
     # add the sigmoid output layer
     output = Dense(1, activation='sigmoid' , name = 'out')(dot_product)
 
     # create the primary training model
-    #o = Adagrad(lr=0.001)
     #o = Adadelta(lr=1.0, rho=0.95)
-
     o = RMSprop(lr=0.025, rho=0.9)
-
-
     #o = Adagrad(lr=0.000075)
-
     model = Model(inputs=[input_target,input_context], outputs=[output])
     model.compile(loss='binary_crossentropy', optimizer=o , metrics = [ 'binary_accuracy'])
-    embedder = Model( inputs=[input_target], output=target )
-    validation_model = Model(input=[input_target, input_context], output=similarity)
-
-    ###modify this
-    batchiter = 10000
-    epochs = 100
-
+    #embedder = Model( inputs=[input_target], outputs=[target] )
 
 if retrain == True:
     model = print('Load the model..')
@@ -267,12 +258,13 @@ if retrain == True:
     #o = Nadam(lr=0.002, beta_1=0.9, beta_2=0.999)
     model.compile(loss='binary_crossentropy', optimizer=o , metrics = [ 'binary_accuracy'])
 
+
 mc = ModelCheckpoint(modelfile, monitor = 'loss', mode = 'min', verbose = 1, save_best_only = False)
 lr = ReduceLROnPlateau(monitor='loss', factor=0.5, patience= 20 , min_lr=0.000001 , verbose = 1)
-tb = TensorBoard(log_dir='./logs', histogram_freq=0, batch_size=32, write_graph=True, write_grads=False, write_images=False, embeddings_freq=0, embeddings_layer_names=None, embeddings_metadata=None, embeddings_data=None, update_freq='epoch')
-
-history = model.fit_generator(makesamples( gaf, obo ,sampling , c, index , Yancestors ), steps_per_epoch=10000, epochs=10000, verbose=1,
-callbacks=[ mc , lr , tb  ], max_queue_size=10, workers=1, use_multiprocessing=False, shuffle=True, initial_epoch=0)
-
-model.save(modelfile)
-embedder.save(modelfile+'embedder')
+tb = TensorBoard(log_dir='./logs',  update_freq='epoch')
+#for sample in samplegen:
+for sample in samplegen:
+    x,y = sample
+    model.fit( x,y , verbose=1, epochs= 100,  callbacks=[  tb, lr ])
+    model.save(modelfile)
+#embedder.save(modelfile+'embedder')
