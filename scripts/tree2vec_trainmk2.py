@@ -143,7 +143,7 @@ modelfile = alnfile + 'embedding_newfile_TF.h5'
 #ts = '2021-08-08T11:16:34.358764'
 ts = '2021-08-08T14:37:59.736512'
 overwrite_mat = False
-retrain = False
+retrain = True
 blur_iterations = 30
 
 
