@@ -5,7 +5,8 @@ from keras.layers import *
 from keras.metrics import *
 from keras.regularizers import *
 from keras.callbacks import *
-import tensorflow as tf
+from tensorflow.compat.v1 import ConfigProto , Session
+from tensorflow.compat.v1.keras import backend as K
 import pickle
 import collections
 import itertools
@@ -24,16 +25,10 @@ import os
 import glob
 import pdb
 import random
-import tensorflow as tf
-from tensorflow.compat.v1 import ConfigProto
-from tensorflow.compat.v1 import InteractiveSession
-from tensorflow.compat.v1.keras import backend as K
-
 config = ConfigProto()
 config.gpu_options.allow_growth = True
 config.gpu_options.per_process_gpu_memory_fraction= 0.95
-tf.compat.v1.keras.backend.set_session(tf.compat.v1.Session(config=config) )
-
+K.set_session(Session(config=config) )
 
 def yeildBags( mat ):
   nzrows = list( np.where( mat.sum( axis = 1 ) > 0 )[0])
@@ -103,7 +98,7 @@ def yield_posi( sampling , mat , nposi  , iter_row= 10 , itermax = 100,  fancy =
                     positives = None
         
 def yield_samples( mat , sampling ,index , pow= .75 , split =.75 ,nsamples = 1000):
-    terms = list(sampling.keys())
+
     #pick over represented columns more often in negatives
     nnega = int(nsamples*split)
     nposi = int(nsamples*(1-split))
@@ -131,7 +126,6 @@ def make_neg_sampling( mat , z =.01 , pow = .75 ):
     sumv = sumv/np.amax(sumv)
     sampling = dict(zip( list(nonzero), list(sumv.flat)))
     index = dict( zip( sampling.keys(), range(len(sampling.keys()))))
-
     return  sampling , index
 
 
@@ -144,12 +138,12 @@ treefile = '/scratch/dmoi/datasets/covid_data/msa_0730/global.tree'
 alnh5 = alnfile+'.h5'
 
 
-modelfile = alnfile + 'embeddingTF.h5'
+modelfile = alnfile + 'embedding_newfile_TF.h5'
 
 #ts = '2021-08-08T11:16:34.358764'
 ts = '2021-08-08T14:37:59.736512'
-overwrite_mat = True
-retrain = True
+overwrite_mat = False
+retrain = False
 blur_iterations = 30
 
 
@@ -223,7 +217,7 @@ else:
 nterms = len(sampling)
 
 
-samplegen = yield_samples( blurmat , index , sampling , pow= .75 , split =.75 ,nsamples = 100000)
+samplegen = yield_samples( blurmat , sampling, index , pow= .75 , split =.5 ,nsamples = 100000)
 print(nterms)
 
 
