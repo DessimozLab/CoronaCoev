@@ -102,9 +102,8 @@ def yield_posi( sampling , mat , nposi  , iter_row= 10 , itermax = 100,  fancy =
                     yield positives
                     positives = None
         
-def yield_samples( mat , sampling , pow= .75 , split =.75 ,nsamples = 1000):
+def yield_samples( mat , sampling ,index , pow= .75 , split =.75 ,nsamples = 1000):
     terms = list(sampling.keys())
-    index = dict( zip( sampling.keys(), range(len(sampling.keys()))))
     #pick over represented columns more often in negatives
     nnega = int(nsamples*split)
     nposi = int(nsamples*(1-split))
@@ -130,26 +129,28 @@ def make_neg_sampling( mat , z =.01 , pow = .75 ):
     sumv = sumv[0,nonzero]
     sumv = np.multiply( np.power( sumv / z , pow ) +1 , z / sumv ) 
     sumv = sumv/np.amax(sumv)
-    return dict(zip( list(nonzero), list(sumv.flat)))
+    sampling = dict(zip( list(nonzero), list(sumv.flat)))
+    index = dict( zip( sampling.keys(), range(len(sampling.keys()))))
+
+    return  sampling , index
 
 
 #load and add bootstraps
 
-treefile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
-alnfile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
-#alnfile = '/scratch/dmoi/datasets/covid_data/msa_0730/msa_0730.fasta'
-#treefile = '/scratch/dmoi/datasets/covid_data/msa_0730/global.tree'
+#treefile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
+#alnfile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
+alnfile = '/scratch/dmoi/datasets/covid_data/msa_0730/msa_0730.fasta'
+treefile = '/scratch/dmoi/datasets/covid_data/msa_0730/global.tree'
 alnh5 = alnfile+'.h5'
 
 
 modelfile = alnfile + 'embeddingTF.h5'
 
-ts = '2021-08-08T11:16:34.358764'
-#ts = '2021-08-08T14:37:59.736512'
-overwrite_mat = False
-retrain = False
-
-blur_iterations = 50
+#ts = '2021-08-08T11:16:34.358764'
+ts = '2021-08-08T14:37:59.736512'
+overwrite_mat = True
+retrain = True
+blur_iterations = 30
 
 
 if overwrite_mat or not os.path.exists( alnfile + '_blurmat.pkl'):
@@ -205,26 +206,30 @@ if overwrite_mat or not os.path.exists( alnfile + '_blurmat.pkl'):
     #blur matrix
     blurmat = copy.deepcopy(AAmat)
     for blur in range(blur_iterations):
+        print(blur)
         blurmat += connectmat.dot(blurmat)
+        print('done')
 
     #generate sampling
-    sampling = make_neg_sampling( blurmat )
+    sampling , index = make_neg_sampling( blurmat )
 
     with open( alnfile + '_blurmat.pkl' , 'wb' ) as matout:
-        matout.write( pickle.dumps([sampling,blurmat])) 
+        matout.write( pickle.dumps([sampling,index , blurmat])) 
 else:
     with open( alnfile + '_blurmat.pkl' , 'rb' ) as matout:
-        sampling,blurmat = pickle.loads(matout.read() ) 
+        sampling,index ,blurmat = pickle.loads(matout.read() ) 
 
 
 nterms = len(sampling)
 
 
-samplegen = yield_samples( blurmat , sampling , pow= .75 , split =.75 ,nsamples = 10000)
+samplegen = yield_samples( blurmat , index , sampling , pow= .75 , split =.75 ,nsamples = 100000)
 print(nterms)
+
+
 vector_dim = 10
-print(next(samplegen))
-if retrain == False:    
+if retrain == False:
+ 
     #word2vec model to be trained
     input_target = Input((1,) , name='target_in')
     input_context = Input((1,) , name='context_in')
@@ -248,13 +253,13 @@ if retrain == False:
     #o = Adagrad(lr=0.000075)
     model = Model(inputs=[input_target,input_context], outputs=[output])
     model.compile(loss='binary_crossentropy', optimizer=o , metrics = [ 'binary_accuracy'])
-    #embedder = Model( inputs=[input_target], outputs=[target] )
+    embedder = Model( inputs=[input_target], outputs=[target] )
 
 if retrain == True:
     model = print('Load the model..')
     model = load_model(modelfile)
-    #o = RMSprop(lr=0.0001, rho=0.9)
-    o = Adadelta(lr=0.0001)
+    o = RMSprop(lr=0.025, rho=0.9)
+    #o = Adadelta(lr=0.0001)
     #o = Nadam(lr=0.002, beta_1=0.9, beta_2=0.999)
     model.compile(loss='binary_crossentropy', optimizer=o , metrics = [ 'binary_accuracy'])
 
@@ -263,8 +268,10 @@ mc = ModelCheckpoint(modelfile, monitor = 'loss', mode = 'min', verbose = 1, sav
 lr = ReduceLROnPlateau(monitor='loss', factor=0.5, patience= 20 , min_lr=0.000001 , verbose = 1)
 tb = TensorBoard(log_dir='./logs',  update_freq='epoch')
 #for sample in samplegen:
+
+
 for sample in samplegen:
     x,y = sample
-    model.fit( x,y , verbose=1, epochs= 100,  callbacks=[  tb, lr ])
+    print(x[0],y,x[0].shape,y.shape)
+    model.fit( x,y , verbose=1, epochs= 100, shuffle=True, callbacks=[  tb, lr ])
     model.save(modelfile)
-#embedder.save(modelfile+'embedder')
