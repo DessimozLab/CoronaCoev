@@ -41,12 +41,13 @@ def yeildBags( mat ):
         index = list(index[:,1])
         yield  index , mat[row,:].todense() , row
 
-def yield_nega( sampling , nnega , pow = .75 ):
+def yield_nega( sampling , nnega , pow = .75 , simple = True):
     negatives = []
     terms = list(sampling.keys())
     while True:
         neg1 = [ random.choice(terms) for i in range(int(2 * nnega)) ]
-        neg1 = [ n for n in neg1 if random.uniform(0, 1) < sampling[n]]
+        if simple == False:
+            neg1 = [ n for n in neg1 if random.uniform(0, 1) < sampling[n]]
         if len(neg1)%2 == 1:
             neg1 = neg1[:-1]
         neg2 = np.array(neg1[0:int(len(neg1)/2)])
@@ -138,12 +139,15 @@ treefile = '/scratch/dmoi/datasets/covid_data/msa_0730/global.tree'
 alnh5 = alnfile+'.h5'
 
 
-modelfile = alnfile + 'embedding_newfile_TF.h5'
+#modelfile = alnfile + 'embedding_newfile_TF.h5'
+modelfile = alnfile + 'embedding_simpleneg_TF.h5'
+
+
 
 #ts = '2021-08-08T11:16:34.358764'
 ts = '2021-08-08T14:37:59.736512'
 overwrite_mat = False
-retrain = True
+retrain = False
 blur_iterations = 30
 
 
