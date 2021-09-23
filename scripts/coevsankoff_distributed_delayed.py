@@ -187,7 +187,6 @@ def compute_matrices(  resdf  ,  matsize , transitionsNT = 12 , transitionsAA = 
     count = 0
     AA_mutation = None
     nucleotide_mutation = None
-
     for idx,row in resdf.iterrows():
         #get next job completed
         eventtypes , eventindex , AAeventindex , AAeventypes= row[['type' , 'index' , 'AAeventindex' , 'AAeventypes']]

@@ -1,12 +1,5 @@
 import numpy as np
-from keras.models import *
-from keras.optimizers import *
-from keras.layers import *
-from keras.metrics import *
-from keras.regularizers import *
-from keras.callbacks import *
-from tensorflow.compat.v1 import ConfigProto , Session
-from tensorflow.compat.v1.keras import backend as K
+
 import pickle
 import collections
 import itertools
@@ -25,10 +18,8 @@ import os
 import glob
 import pdb
 import random
-config = ConfigProto()
-config.gpu_options.allow_growth = True
-config.gpu_options.per_process_gpu_memory_fraction= 0.95
-K.set_session(Session(config=config) )
+
+
 
 def yeildBags( mat ):
   nzrows = list( np.where( mat.sum( axis = 1 ) > 0 )[0])
@@ -41,7 +32,7 @@ def yeildBags( mat ):
         index = list(index[:,1])
         yield  index , mat[row,:].todense() , row
 
-def yield_nega( sampling , nnega , pow = .75 , simple = True):
+def yield_nega( sampling , nnega , pow = .75 , simple = False):
     negatives = []
     terms = list(sampling.keys())
     while True:
@@ -55,7 +46,7 @@ def yield_nega( sampling , nnega , pow = .75 , simple = True):
         ret = np.vstack( [neg1,neg2] ).T
         yield ret
 
-def yield_posi( sampling , mat , nposi  , iter_row= 10 , itermax = 100,  fancy = False, verbose = False):
+def yield_posi( sampling , mat , nposi  , iter_row= 10 , itermax = 100,  fancy = False , verbose = False):
     cols = itertools.cycle(yeildBags(mat ) )
     positives =None
     while True:
@@ -138,55 +129,69 @@ alnfile = '/scratch/dmoi/datasets/covid_data/msa_0730/msa_0730.fasta'
 treefile = '/scratch/dmoi/datasets/covid_data/msa_0730/global.tree'
 alnh5 = alnfile+'.h5'
 
-
 #modelfile = alnfile + 'embedding_newfile_TF.h5'
-modelfile = alnfile + 'embedding_simpleneg_TF.h5'
+#modelfile = alnfile + 'embedding_simpleneg_TF.h5'
 
+modelfile = alnfile + 'embedding_15TF.h5'
 
 
 #ts = '2021-08-08T11:16:34.358764'
 ts = '2021-08-08T14:37:59.736512'
-overwrite_mat = False
-retrain = False
+
+
+overwrite_mat = True
+retrain = True
+
+preprocess = True
+
 blur_iterations = 30
 
 
 if overwrite_mat or not os.path.exists( alnfile + '_blurmat.pkl'):
     #blur w connectivity mat
 
-    events = alnfile+'*'+ts+'*'
-    eventmats = glob.glob(events)
-    nucleotide_mutation = None
-    AA_mutation = None
-    for mat in eventmats:
-        with open( mat , 'rb') as pklin:
-            mats = pickle.loads(pklin.read())
-            print(mats)
-            if AA_mutation is None:
-                nucleotide_mutation = mats[1]
-                AA_mutation = mats[0]
-            else:
-                nucleotide_mutation += mats[1]
-                AA_mutation += mats[0]
-    print(nucleotide_mutation)
-    print(AA_mutation)
-    AA_mutation/=len(eventmats)
+    if preprocess is None:
+        events = alnfile+'*'+ts+'*'
+        eventmats = glob.glob(events)
+        nucleotide_mutation = None
+        AA_mutation = None
+        for mat in eventmats:
+            with open( mat , 'rb') as pklin:
+                mats = pickle.loads(pklin.read())
+                print(mats)
+                if AA_mutation is None:
+                    nucleotide_mutation = mats[1]
+                    AA_mutation = mats[0]
+                else:
+                    nucleotide_mutation += mats[1]
+                    AA_mutation += mats[0]
+        print(nucleotide_mutation)
+        print(AA_mutation)
+        AA_mutation/=len(eventmats)
 
-    #load sparse ND array
-    from scipy.sparse import coo_matrix
-    print(AA_mutation.shape)
-    for i in range( AA_mutation.shape[2] ):
-        if i == 0:
-            AAmat =  AA_mutation[:,:,i]
-        else:
-            AAmat +=  AA_mutation[:,:,i]
-    AAmat = AAmat.to_scipy_sparse()
+        #load sparse ND array
+        from scipy.sparse import coo_matrix
+        print(AA_mutation.shape)
+        for i in range( AA_mutation.shape[2] ):
+            if i == 0:
+                AAmat =  AA_mutation[:,:,i]
+            else:
+                AAmat +=  AA_mutation[:,:,i]
+        AAmat = AAmat.to_scipy_sparse()
+
+    else:
+        print('loading filtered mat')
+        with open(alnfile + 'AAmat_sum.pkl' , 'rb' ) as pklin:
+            AAmat = pickle.loads( pklin.read() )
+
+
     sys.setrecursionlimit(10**6)
     tree = dendropy.Tree.get(
         path=treefile,
         schema='newick')
     treelen = tree.length()
     treenodes = len(tree.nodes())
+
     print('nodes',treenodes)
     print('length',treelen)
     for i,n in enumerate(tree.nodes()):
@@ -225,7 +230,25 @@ samplegen = yield_samples( blurmat , sampling, index , pow= .75 , split =.5 ,nsa
 print(nterms)
 
 
-vector_dim = 10
+vector_dim = 15
+
+
+
+from keras.models import *
+from keras.optimizers import *
+from keras.layers import *
+from keras.metrics import *
+from keras.regularizers import *
+from keras.callbacks import *
+from tensorflow.compat.v1 import ConfigProto , Session
+from tensorflow.compat.v1.keras import backend as K
+config = ConfigProto()
+config.gpu_options.allow_growth = True
+config.gpu_options.per_process_gpu_memory_fraction= 0.95
+K.set_session(Session(config=config) )
+
+
+
 if retrain == False:
  
     #word2vec model to be trained
@@ -266,10 +289,5 @@ mc = ModelCheckpoint(modelfile, monitor = 'loss', mode = 'min', verbose = 1, sav
 lr = ReduceLROnPlateau(monitor='loss', factor=0.5, patience= 20 , min_lr=0.000001 , verbose = 1)
 tb = TensorBoard(log_dir='./logs',  update_freq='epoch')
 #for sample in samplegen:
-
-
-for sample in samplegen:
-    x,y = sample
-    print(x[0],y,x[0].shape,y.shape)
-    model.fit( x,y , verbose=1, epochs= 100, shuffle=True, callbacks=[  tb, lr ])
-    model.save(modelfile)
+model.fit( samplegen , verbose=1, callbacks=[  tb, lr ])
+model.save(modelfile)

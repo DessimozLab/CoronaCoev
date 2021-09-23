@@ -2,7 +2,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=20
-#SBATCH --mem=100G
+#SBATCH --mem=80G
 #SBATCH --time=24:00:00
 #SBATCH --job-name=python
 #SBATCH --output=master_slurm.out
