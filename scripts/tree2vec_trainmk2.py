@@ -18,7 +18,7 @@ import os
 import glob
 import pdb
 import random
-
+import scipy.sparse as sparse
 
 
 def yeildBags( mat ):
@@ -122,11 +122,11 @@ def make_neg_sampling( mat , z =.01 , pow = .75 ):
 
 
 #load and add bootstraps
-
 #treefile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
 #alnfile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
 alnfile = '/scratch/dmoi/datasets/covid_data/msa_0730/msa_0730.fasta'
 treefile = '/scratch/dmoi/datasets/covid_data/msa_0730/global.tree'
+
 alnh5 = alnfile+'.h5'
 
 #modelfile = alnfile + 'embedding_newfile_TF.h5'
@@ -137,20 +137,16 @@ modelfile = alnfile + 'embedding_15TF.h5'
 
 #ts = '2021-08-08T11:16:34.358764'
 ts = '2021-08-08T14:37:59.736512'
+overwrite_mat = False
 
-
-overwrite_mat = True
 retrain = True
-
 preprocess = True
-
 blur_iterations = 30
-
+vector_dim = 15
 
 if overwrite_mat or not os.path.exists( alnfile + '_blurmat.pkl'):
     #blur w connectivity mat
-
-    if preprocess is None:
+    if preprocess == False:
         events = alnfile+'*'+ts+'*'
         eventmats = glob.glob(events)
         nucleotide_mutation = None
@@ -183,8 +179,7 @@ if overwrite_mat or not os.path.exists( alnfile + '_blurmat.pkl'):
         print('loading filtered mat')
         with open(alnfile + 'AAmat_sum.pkl' , 'rb' ) as pklin:
             AAmat = pickle.loads( pklin.read() )
-
-
+    AAmat = AAmat/AAmat.max()
     sys.setrecursionlimit(10**6)
     tree = dendropy.Tree.get(
         path=treefile,
@@ -230,7 +225,6 @@ samplegen = yield_samples( blurmat , sampling, index , pow= .75 , split =.5 ,nsa
 print(nterms)
 
 
-vector_dim = 15
 
 
 
@@ -246,8 +240,6 @@ config = ConfigProto()
 config.gpu_options.allow_growth = True
 config.gpu_options.per_process_gpu_memory_fraction= 0.95
 K.set_session(Session(config=config) )
-
-
 
 if retrain == False:
  
@@ -287,7 +279,8 @@ if retrain == True:
 
 mc = ModelCheckpoint(modelfile, monitor = 'loss', mode = 'min', verbose = 1, save_best_only = False)
 lr = ReduceLROnPlateau(monitor='loss', factor=0.5, patience= 20 , min_lr=0.000001 , verbose = 1)
-tb = TensorBoard(log_dir='./logs',  update_freq='epoch')
+tb = TensorBoard(log_dir='./logs_mk2',  update_freq='epoch')
 #for sample in samplegen:
-model.fit( samplegen , verbose=1, callbacks=[  tb, lr ])
+
+model.fit( samplegen , verbose=1, callbacks=[  tb, lr , mc ], steps_per_epoch = 100 , epochs = 1000000 )
 model.save(modelfile)
