@@ -11,6 +11,6 @@
 # load environment, e.g. set virtualenv, environment variables, etc
 
 source /scratch/dmoi/miniconda/etc/profile.d/conda.sh
-conda activate ML
+conda activate ML2
 # Run Jupyter
 python coevsankoff_distributed_delayed.py

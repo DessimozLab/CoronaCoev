@@ -12,6 +12,5 @@
 source /scratch/dmoi/miniconda/etc/profile.d/conda.sh
 conda activate ML
 
-# Run Jupyter
 
 python coevsankoff_distributed.py

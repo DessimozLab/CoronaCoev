@@ -122,10 +122,11 @@ def make_neg_sampling( mat , z =.01 , pow = .75 ):
 
 
 #load and add bootstraps
-#treefile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
-#alnfile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
-alnfile = '/scratch/dmoi/datasets/covid_data/msa_0730/msa_0730.fasta'
-treefile = '/scratch/dmoi/datasets/covid_data/msa_0730/global.tree'
+treefile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
+alnfile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
+
+#alnfile = '/scratch/dmoi/datasets/covid_data/msa_0730/msa_0730.fasta'
+#treefile = '/scratch/dmoi/datasets/covid_data/msa_0730/global.tree'
 
 alnh5 = alnfile+'.h5'
 
@@ -135,16 +136,16 @@ alnh5 = alnfile+'.h5'
 modelfile = alnfile + 'embedding_15TF.h5'
 
 
-#ts = '2021-08-08T11:16:34.358764'
-ts = '2021-08-08T14:37:59.736512'
-overwrite_mat = False
+ts = '2021-08-08T11:16:34.358764'
+#ts = '2021-08-08T14:37:59.736512'
 
-retrain = True
-preprocess = True
+overwrite_mat = True
+retrain = False
+preprocess = False
 blur_iterations = 30
 vector_dim = 15
 
-if overwrite_mat or not os.path.exists( alnfile + '_blurmat.pkl'):
+if overwrite_mat == True or not os.path.exists( alnfile + '_blurmat.pkl'):
     #blur w connectivity mat
     if preprocess == False:
         events = alnfile+'*'+ts+'*'
@@ -179,6 +180,7 @@ if overwrite_mat or not os.path.exists( alnfile + '_blurmat.pkl'):
         print('loading filtered mat')
         with open(alnfile + 'AAmat_sum.pkl' , 'rb' ) as pklin:
             AAmat = pickle.loads( pklin.read() )
+
     AAmat = AAmat/AAmat.max()
     sys.setrecursionlimit(10**6)
     tree = dendropy.Tree.get(
@@ -221,7 +223,7 @@ else:
 nterms = len(sampling)
 
 
-samplegen = yield_samples( blurmat , sampling, index , pow= .75 , split =.5 ,nsamples = 100000)
+samplegen = yield_samples( blurmat , sampling, index , pow= .75 , split =.5 ,nsamples = 10000)
 print(nterms)
 
 
@@ -240,6 +242,7 @@ config = ConfigProto()
 config.gpu_options.allow_growth = True
 config.gpu_options.per_process_gpu_memory_fraction= 0.95
 K.set_session(Session(config=config) )
+
 
 if retrain == False:
  

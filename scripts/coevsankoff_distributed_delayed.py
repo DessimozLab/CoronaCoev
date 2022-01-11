@@ -29,7 +29,7 @@ import dask.array as da
 import dask.dataframe as dd
 from dask.delayed import delayed
 from dask import delayed, compute
-
+import argparse
 from datetime import datetime, timedelta
 
 
@@ -134,14 +134,18 @@ def calculate_small_parsimony(tree , df  ,  bootstrap = None , position = 0 ):
 
     #change a subset of leaves to ambiguous characters
     pos = 0
-    for idx,alncol in df.iterrows():
+    for idx in range(df.shape[0]):
+
+        alncol = df[idx , : ]
+
         for l in t.leaf_nodes():
             #setup for small_pars1
             l.calc[pos] = True
             l.event[pos] = 0
             l.scores[pos] = { c:10**10 for c in allowed_symbols }
             l.symbols[pos] =  allowed_symbols
-            if l.aln_row and l.aln_row not in del_genomes and l.aln_row in alncol:
+            if l.aln_row and l.aln_row not in del_genomes:
+
                 char = alncol[ l.aln_row ]
                 if char.upper() in allowed_symbols:
                     l.symbols[pos] = { char }
@@ -154,7 +158,7 @@ def calculate_small_parsimony(tree , df  ,  bootstrap = None , position = 0 ):
                 l.symbols[pos] =  allowed_symbols
             l.char[pos] = min(l.scores[pos], key=l.scores[pos].get)
         pos+=1
-    #up
+    #upq
     process_node_smallpars_1(t.seed_node)
     #down
     process_node_smallpars_2(t.seed_node)
@@ -213,41 +217,75 @@ if __name__ == '__main__':
 
     sys.setrecursionlimit( 10 **8 )
     ts = datetime.utcnow().isoformat()
+
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--tree', help='tree corresponding to the alignment',type = str)
+    parser.add_argument('--aln', help='alignment corresponding to the tree',type = str)
+    parser.add_argument('--distributed', help='run in distributed mode' , type = str)
+    parser.add_argument('--blastpath', help='blastpath',type = str)
+    parser.add_argument('--refproteome', help='reference proteome' , type = str)
+    parser.add_argument('--overwrite', help='overwrite HDF5 of aln' , type = str)
+    parser.add_argument('--verbose', help='overwrite HDF5 of aln' , type = str)
+
+    args = vars(parser.parse_args(sys.argv[1:]))
+
+    print(args)
     print('timestamp',ts)
-
-
     tag = 'small_test'
-    #number of cores to use
-
-    distributed_computation = True
 
     #fraction of genomes to remove if jackknifing
-    bootstrap = .25
-    overwrite = False
+    #bootstraps = [ .001 , .01, .1 , .5  ,  .9  , .99    ]
+    bootstraps = [ .25  ]
+    bootstrap_replicates = 5
+
+    #defaults
+
+    verbose = True
+    
+    distributed_computation = True
+    
+
+    overwrite = True 
     overwrite_annot = True
     overwrite_index = False
+
     #number of replicates
-    bootstrap_replicates = 20
     restart = None
     nucleotides_only = False
 
-
-
     blastpath = '/scratch/dmoi/software/ncbi-blast-2.11.0+-src/c++/ReleaseMT/bin/'
-
-
     refproteodb = '/scratch/dmoi/datasets/covid_data/refproteome/covidrefproteome.fasta'
     #refproteodb = '/scratch/dmoi/datasets/covid_data/structs/covid_structs.fasta'
 
-    alnfile = '/scratch/dmoi/datasets/covid_data/msa_0730/msa_0730.fasta'
-    treefile = '/scratch/dmoi/datasets/covid_data/msa_0730/global.tree'
+    alnfile = '/scratch/dmoi/datasets/covid_data/dec_7/2021-12-07_masked.fa'
+    treefile = '/scratch/dmoi/datasets/covid_data/dec_7/global.tree'
 
+    #alnfile = '/scratch/dmoi/datasets/covid_data/mmsa_2021-11-02/2021-11-02_masked.fa'
+    #treefile = '/scratch/dmoi/datasets/covid_data/mmsa_2021-11-02/global.tree'
+
+    #alnfile = '/scratch/dmoi/datasets/covid_data/msa_0730/msa_0730.fasta'
+    #treefile = '/scratch/dmoi/datasets/covid_data/msa_0730/global.tree'
 
     #treefile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
     #alnfile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
 
     #treefile = '../validation_data/16s/16s_salaminWstruct_aln.fasta.treefile'
     #alnfile = '../validation_data/16s/16s_salaminWstruct_aln.fasta'
+
+
+    if args['tree']:
+        treefile = args['tree']
+    if args['aln']:
+        alnfile = args['aln']
+    if args['blastpath']:
+        taxfilter = args['blastpath']
+    if args['refproteome']:
+        taxmask = args['refproteome']
+    if args['distributed']:
+        if args['distributed'] == 'True':
+            distributed_computation = True
+        else:
+            distributed_computation = False
 
     #create distributed cluster
     #use blast based annotation to assign codons to column ranges
@@ -271,6 +309,15 @@ if __name__ == '__main__':
     
     ###########################################aln to hdf5 
 
+
+    def clipID(ID):
+        if '|' in ID:
+            ID =  ID.split('|')[1]
+        if '_' in ID:
+            ID = ID.replace( '_' , ' ')
+        return ID
+
+
     print('preparing tree IDs')
     if os.path.exists( alnfile + '_IDs.pkl') and overwrite_index==False:
         with open( alnfile + '_IDs.pkl' , 'rb') as idxin:
@@ -281,84 +328,13 @@ if __name__ == '__main__':
         msa = SeqIO.parse(alnfile , format = 'fasta')
         #def clipID(ID):
         #    return ''.join( [ s +'|' for s in str(ID).split('|')[:-1] ])[:-1].replace('_',' ')
-        def clipID(ID):
-            if '|' in ID:
-                ID =  ID.split('|')[1]
-            if '_' in ID:
-                ID = ID.replace( '_' , ' ')
-            return ID
+        
         IDs = {i:clipID(rec.id) for i,rec in enumerate(msa)}
         IDindex = dict(zip( IDs.values() , IDs.keys() ) )
         print( [(t,IDindex[t]) for t in list(IDindex.keys())[0:10]] )
         with open( alnfile + '_IDs.pkl' , 'wb') as idxout:
             idxout.write(pickle.dumps(IDindex))
     
-    #### creat hdf5 aln ###
-    if os.path.exists(alnfile +'.h5') and overwrite == False:
-        pass
-    else:
-        print('aln2numpy ')
-        def ret_msa(alnfile):
-            with open( alnfile ,'r') as msa:
-                ret = []
-                s = None
-                for l in msa:
-                    if '>' not in l:
-                        if s:
-                            s+=l.strip()
-                        else:
-                            s = l.strip()
-                    else:
-                        if s:
-                            if clipID(l) in found:
-                                ret.append(list(s.upper()))
-                                if len(ret) > 1000:
-                                    yield np.array(ret,  np.dtype('S1') ).T
-                                    ret = []
-                                    s = None
-                        s = None
-                if len( ret ) > 0:
-                    yield np.array(ret, np.dtype('S1')).T
-        gen = ret_msa(alnfile)
-        chunk = next(gen)
-        dtype = chunk.dtype
-        row_count = chunk.shape[1]
-        maxshape = ( 60000, None)
-        with h5py.File(alnfile +'.h5', 'w' ) as f:
-            # Initialize a resizable dataset to hold the output
-            #maxshape = (None,None) + chunk.shape[1:]
-            dset = f.create_dataset('MSA2array', shape=chunk.shape, maxshape=maxshape,
-                                    chunks=chunk.shape, dtype=chunk.dtype)
-            dset[0:chunk.shape[0], 0:chunk.shape[1]] = chunk
-            for i,chunk in enumerate(gen):
-                if i % 10 == 0:
-                    print(dset.shape)
-                # Resize the dataset to accommodate the next chunk of rows
-                dset.resize(row_count + chunk.shape[1], axis=1)
-                # Write the next chunk
-                dset[0:chunk.shape[0],row_count:] = chunk
-                row_count += chunk.shape[1]
-        print('done')
-
-
-    seq = IDs[100]
-    print('reference seq chosen in aln for codons: ' , seq)
-
-    print('loading aln')
-    with h5py.File(alnfile +'.h5', 'r') as hf:
-        align_array = hf['MSA2array'][:]
-        print(align_array.shape)
-        aln_row = align_array[:,IDindex[seq]]
-        nongap_cols = [ i for i,c in enumerate(list(aln_row)) if c != b'-' ]        
-        print(aln_row[0:100])
-        print('nongap:' , nongap_cols[0:100] , '...')
-        print('selecting non gap columns of aln from ref geno')
-        align_array = align_array[nongap_cols, :] 
-        print( align_array.shape )
-        daskdf = pd.DataFrame( data = align_array )
-        del align_array
-
-
     ###########################################init tree
     print('reading tree')
     tree = dendropy.Tree.get(
@@ -392,53 +368,24 @@ if __name__ == '__main__':
         l.char= {}
         l.calc = {}
     print('missing leaves:' , len(missing))
-
     found = set(found)
-    print(len(tree.leaf_nodes()))
+    print('found leaves:', len(found))
+    print('out of n nodes:', len(tree.leaf_nodes()))
     print('done')
 
+    seq = IDs[100]
+    with h5py.File(alnfile +'.h5', 'r') as hf:     
+        align_array = hf['MSA2array']
+        print(align_array.shape)
+        aln_row = align_array[:,IDindex[seq]]
+        nongap_cols = [ i for i,c in enumerate(list(aln_row)) if c != b'-' ]        
+        print(aln_row[0:100])
+        print('nongap:' , nongap_cols[0:100] , '...')    
 
-    print('flashing up a dask cluster')
-    if distributed_computation == True:
+    #make map from selected ref geno positions to aln columns
+    column_map = { i:nongap_cols[i-1] for i in range(1,len(nongap_cols)+1)}
 
-
-        NCORE = 10
-        njobs = 20
-        print('deploying cluster')
-
-
-        cluster = SLURMCluster(
-            walltime='24:00:00',
-            n_workers = NCORE,
-            cores=NCORE,
-            processes = NCORE,
-            interface='ib0',
-            memory="150GB",
-            env_extra=[
-            'source /scratch/dmoi/miniconda/etc/profile.d/conda.sh',
-            'conda activate ML'
-            ],
-            scheduler_options={'interface': 'ens2f0' }
-        )
-        print(cluster.job_script())
-        #cluster.adapt(minimum=10, maximum=30)
-        cluster.scale(jobs=20)
-        time.sleep(5)
-        print(cluster)
-        print(cluster.dashboard_link)
-        client = Client(cluster , timeout='450s' , set_as_default=True )
-    else:
-        NCORE = 50
-        njobs = 1
-        print('testing')
-        cluster = LocalCluster(n_workers = NCORE )
-        #cluster.adapt(minimum = 50,  maximum=NCORE)
-        print(cluster.dashboard_link)
-        client = Client(cluster)
-    print('done')
-
-    #keep non gap positions for one referene geno
-    print('done')
+    ##annotate sequence with ref proteome
     if nucleotides_only == False:
         #use blast based annotation
         if os.path.exists(alnfile +'annotation.csv' ) and overwrite_annot == False:
@@ -485,72 +432,116 @@ if __name__ == '__main__':
         print('using dummy annot')
         dummy_annot = {'dummy_gene': { 'qstart':1 , 'qend':align_array.shape[0]-1 , 'evalue':0  }}
         annotation = pd.DataFrame.from_dict( dummy_annot , orient = 'index')
+        positions = [ i for i in range(1,align_array.shape[0], 3 ) ]
+
+
+
+
+    print('flashing up a dask cluster')
+    if distributed_computation == True:
+        NCORE = 10
+        njobs = 20
+        print('deploying cluster')
+        cluster = SLURMCluster(
+            walltime='24:00:00',
+            n_workers = NCORE,
+            cores=NCORE,
+            processes = NCORE,
+            interface='ib0',
+            memory="100GB",
+            env_extra=[
+            'source /scratch/dmoi/miniconda/etc/profile.d/conda.sh',
+            'conda activate ML2'
+            ],
+            scheduler_options={'interface': 'ens2f0' }
+        )
+        print(cluster.job_script())
+        #cluster.adapt(minimum=10, maximum=30)
+        cluster.scale(jobs=20)
+        time.sleep(5)
+        print(cluster)
+        print(cluster.dashboard_link)
+        client = Client(cluster , timeout='450s' , set_as_default=True )
+    else:
+        NCORE = 50
+        njobs = 1
+        print('testing')
+        cluster = LocalCluster(n_workers = NCORE )
+        #cluster.adapt(minimum = 50,  maximum=NCORE)
+        print(cluster.dashboard_link)
+        client = Client(cluster)
+    print('done')
+    
 
     #######start the sankof algo here #######################
     print('starting sankof')
     row_index = IDindex
     count =0
+    print('scattering tree to workers')
     remote_tree = client.scatter( lzma.compress( pickle.dumps(tree) ) , broadcast=True )
-    retmatsize = ( len(tree.nodes()) ,daskdf.shape[0]  )
+    print('done')
     coordinates = []
+    with h5py.File(alnfile +'.h5', 'r') as hf:
+        align_array = hf['MSA2array'] 
+        retmatsize = ( len(tree.nodes()) ,align_array.shape[0]  )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            for bootstrap in bootstraps:
+                for k in range(bootstrap_replicates):
+                    inlist = []
+                    count = 0 
+                    #indexing starts at 1 for blast
+                    #####switch to sending the coordinates and masking for the matrix
+                    for i,codon in enumerate(positions):
+                        if nucleotides_only == False:
+                            pos = [column_map[codon], column_map[codon+1] , column_map[codon+2]]
+                        else:
+                            pos = [codon + i for i in range(3) if codon +i < align_array.shape[0]]
+                        res = calculate_small_parsimony( remote_tree ,  delayed_send( align_array[pos ,:] )  , bootstrap , codon )
+                        if verbose == True:
+                            print(pos)
+
+                        inlist.append( res )
+                        if len(inlist)== NCORE*njobs:
+                            print('codon positions left to calclulate' , len(positions) - i )
+                            delayed_mats = [ compute_matrices(df, retmatsize) for df in inlist ]
+                            delayed_mats = dask.compute( * delayed_mats )
+
+                            AAbag = dask.bag.from_sequence([ m[1] for m in delayed_mats ]) 
+                            NTbag = dask.bag.from_sequence([ m[0] for m in delayed_mats ])
+                            
+                            if count ==0 :
+                                matricesAA = dask.compute(AAbag.sum())[0]
+                                matricesNT = dask.compute(NTbag.sum())[0]
+
+                            else:
+                                matricesAA += dask.compute(AAbag.sum())[0]
+                                matricesNT += dask.compute(NTbag.sum())[0]
+
+                            print(sparseND.argwhere(matricesAA))
 
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        
-        for k in range(bootstrap_replicates):
-            inlist = []
-            count = 0 
-            #indexing starts at 1 for blast
-            #####switch to sending the coordinates and masking for the matrix
-            for i,codon in enumerate(positions):
-                pos = [codon, codon+1 , codon+2]
-                res = calculate_small_parsimony( remote_tree , delayed_send( daskdf.loc[pos] )  , bootstrap , codon )
-                inlist.append( res )
-                if len(inlist)== NCORE*njobs:
-                    print('codon positions left to calclulate' , len(positions) - i )
-                    delayed_mats = [ compute_matrices(df, retmatsize) for df in inlist ]
-                    delayed_mats = dask.compute( * delayed_mats )
-
-                    AAbag = dask.bag.from_sequence([ m[1] for m in delayed_mats ]) 
-                    NTbag = dask.bag.from_sequence([ m[0] for m in delayed_mats ])
+                            count += 1
+                            inlist =[]        
                     
-                    if count ==0 :
-                        matricesAA = dask.compute(AAbag.sum())[0]
-                        matricesNT = dask.compute(NTbag.sum())[0]
-
-                    else:
-                        matricesAA += dask.compute(AAbag.sum())[0]
-                        matricesNT += dask.compute(NTbag.sum())[0]
-
+                    #last batch
+                    print('codon positions to calclulate' , len(inlist) )
+                    delayed_mats = [ compute_matrices(df, retmatsize) for df in inlist ]
+                    delayed_mats = dask.compute( *delayed_mats )
+                    AAbag = dask.bag.from_sequence([  m[1] for m in delayed_mats ]) 
+                    NTbag = dask.bag.from_sequence([ m[0] for m in delayed_mats ])
+                    matricesAA += dask.compute(AAbag.sum())[0]
+                    matricesNT += dask.compute(NTbag.sum())[0]
+                    print(matricesAA)
+                    print(matricesNT)
                     print(sparseND.argwhere(matricesAA))
-
-
-                    count += 1
-                    inlist =[]        
-            
-            #last batch
-            print('codon positions to calclulate' , len(inlist) )
-            delayed_mats = [ compute_matrices(df, retmatsize) for df in inlist ]
-            delayed_mats = dask.compute( *delayed_mats )
-            AAbag = dask.bag.from_sequence([  m[1] for m in delayed_mats ]) 
-            NTbag = dask.bag.from_sequence([ m[0] for m in delayed_mats ])
-
-            matricesAA += dask.compute(AAbag.sum())[0]
-            matricesNT += dask.compute(NTbag.sum())[0]
-            
-            print(matricesAA)
-            print(matricesNT)
-            print(sparseND.argwhere(matricesAA))
-            
-            print('done')
-            if bootstrap is None:
-                filename = alnfile +'_' + str(k) +ts+ tag + '_coevmats.pkl' 
-            else:
-                filename = alnfile +'_' + str(k) +ts+ tag + '_BS_coevmats.pkl' 
-
-            with open( filename , 'wb') as coevout:
-                print(filename)
-                print('saving',(matricesAA, matricesNT ) )
-                coevout.write(pickle.dumps((matricesAA, matricesNT )))
-                print('done')
+                    print('done')
+                    if bootstrap is None:
+                        filename = alnfile +'_' + str(k) +ts+ tag  + '_coevmats.pkl' 
+                    else:
+                        filename = alnfile +'_' + str(k) +ts+ tag + str(bootstrap ) + '_BS_coevmats.pkl' 
+                    with open( filename , 'wb') as coevout:
+                        print(filename)
+                        print('saving',(matricesAA, matricesNT ) )
+                        coevout.write(pickle.dumps((matricesAA, matricesNT )))
+                        print('done')
