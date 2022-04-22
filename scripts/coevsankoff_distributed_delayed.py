@@ -247,7 +247,7 @@ if __name__ == '__main__':
 
     overwrite = True 
     overwrite_annot = True
-    overwrite_index = False
+    overwrite_index = True
 
     #number of replicates
     restart = None
@@ -257,8 +257,11 @@ if __name__ == '__main__':
     refproteodb = '/scratch/dmoi/datasets/covid_data/refproteome/covidrefproteome.fasta'
     #refproteodb = '/scratch/dmoi/datasets/covid_data/structs/covid_structs.fasta'
 
-    alnfile = '/scratch/dmoi/datasets/covid_data/dec_7/2021-12-07_masked.fa'
-    treefile = '/scratch/dmoi/datasets/covid_data/dec_7/global.tree'
+    alnfile = '/scratch/dmoi/datasets/covid_data/apr_4_2022/mmsa_2022-04-04/2022-04-04_masked.fa'
+    treefile = '/scratch/dmoi/datasets/covid_data/apr_4_2022/GISAID-hCoV-19-phylogeny-2022-02-28/global.tree'
+
+    #alnfile = '/scratch/dmoi/datasets/covid_data/dec_7/2021-12-07_masked.fa'
+    #treefile = '/scratch/dmoi/datasets/covid_data/dec_7/global.tree'
 
     #alnfile = '/scratch/dmoi/datasets/covid_data/mmsa_2021-11-02/2021-11-02_masked.fa'
     #treefile = '/scratch/dmoi/datasets/covid_data/mmsa_2021-11-02/global.tree'
@@ -434,9 +437,6 @@ if __name__ == '__main__':
         annotation = pd.DataFrame.from_dict( dummy_annot , orient = 'index')
         positions = [ i for i in range(1,align_array.shape[0], 3 ) ]
 
-
-
-
     print('flashing up a dask cluster')
     if distributed_computation == True:
         NCORE = 10
@@ -448,7 +448,7 @@ if __name__ == '__main__':
             cores=NCORE,
             processes = NCORE,
             interface='ib0',
-            memory="100GB",
+            memory="400GB",
             env_extra=[
             'source /scratch/dmoi/miniconda/etc/profile.d/conda.sh',
             'conda activate ML2'
