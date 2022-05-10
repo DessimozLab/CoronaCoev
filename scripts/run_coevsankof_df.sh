@@ -8,9 +8,9 @@
 #SBATCH --output=master_slurm.out
 
 
-# load environment, e.g. set virtualenv, environment variables, etc
 
-source /scratch/dmoi/miniconda/etc/profile.d/conda.sh
+source /work/FAC/FBM/DBC/cdessim2/default/dmoi/miniconda/etc/profile.d/conda.sh
+
 conda activate ML2
 # Run Jupyter
 python coevsankoff_distributed_delayed.py

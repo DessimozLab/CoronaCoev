@@ -253,21 +253,21 @@ if __name__ == '__main__':
     restart = None
     nucleotides_only = False
 
-    blastpath = '/scratch/dmoi/software/ncbi-blast-2.11.0+-src/c++/ReleaseMT/bin/'
-    refproteodb = '/scratch/dmoi/datasets/covid_data/refproteome/covidrefproteome.fasta'
-    #refproteodb = '/scratch/dmoi/datasets/covid_data/structs/covid_structs.fasta'
+    blastpath = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/software/ncbi-blast-2.11.0+-src/c++/ReleaseMT/bin/'
+    refproteodb = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/refproteome/covidrefproteome.fasta'
+    #refproteodb = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/structs/covid_structs.fasta'
 
-    alnfile = '/scratch/dmoi/datasets/covid_data/apr_4_2022/mmsa_2022-04-04/2022-04-04_masked.fa'
-    treefile = '/scratch/dmoi/datasets/covid_data/apr_4_2022/GISAID-hCoV-19-phylogeny-2022-02-28/global.tree'
+    alnfile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/apr_4_2022/mmsa_2022-04-04/2022-04-04_masked.fa'
+    treefile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/apr_4_2022/GISAID-hCoV-19-phylogeny-2022-02-28/global.tree'
 
-    #alnfile = '/scratch/dmoi/datasets/covid_data/dec_7/2021-12-07_masked.fa'
-    #treefile = '/scratch/dmoi/datasets/covid_data/dec_7/global.tree'
+    #alnfile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/dec_7/2021-12-07_masked.fa'
+    #treefile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/dec_7/global.tree'
 
-    #alnfile = '/scratch/dmoi/datasets/covid_data/mmsa_2021-11-02/2021-11-02_masked.fa'
-    #treefile = '/scratch/dmoi/datasets/covid_data/mmsa_2021-11-02/global.tree'
+    #alnfile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/mmsa_2021-11-02/2021-11-02_masked.fa'
+    #treefile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/mmsa_2021-11-02/global.tree'
 
-    #alnfile = '/scratch/dmoi/datasets/covid_data/msa_0730/msa_0730.fasta'
-    #treefile = '/scratch/dmoi/datasets/covid_data/msa_0730/global.tree'
+    #alnfile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/msa_0730/msa_0730.fasta'
+    #treefile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/msa_0730/global.tree'
 
     #treefile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.aln.EPIID.treefile'
     #alnfile = '../validation_data/covid19/gisaid_hcov-2020_08_25.QC.NSoutlier.filter.deMaiomask.EPIID.aln'
@@ -388,6 +388,7 @@ if __name__ == '__main__':
     #make map from selected ref geno positions to aln columns
     column_map = { i:nongap_cols[i-1] for i in range(1,len(nongap_cols)+1)}
 
+
     ##annotate sequence with ref proteome
     if nucleotides_only == False:
         #use blast based annotation
@@ -439,29 +440,29 @@ if __name__ == '__main__':
 
     print('flashing up a dask cluster')
     if distributed_computation == True:
-        NCORE = 10
-        njobs = 20
+        NCORE = 3
+        njobs = 50
         print('deploying cluster')
         cluster = SLURMCluster(
-            walltime='24:00:00',
+            walltime='8:00:00',
             n_workers = NCORE,
             cores=NCORE,
             processes = NCORE,
             interface='ib0',
-            memory="400GB",
+            memory="200GB",
             env_extra=[
-            'source /scratch/dmoi/miniconda/etc/profile.d/conda.sh',
+            'source /work/FAC/FBM/DBC/cdessim2/default/dmoi/miniconda/etc/profile.d/conda.sh',
             'conda activate ML2'
             ],
             scheduler_options={'interface': 'ens2f0' }
         )
         print(cluster.job_script())
         #cluster.adapt(minimum=10, maximum=30)
-        cluster.scale(jobs=20)
+        cluster.scale(jobs=njobs)
         time.sleep(5)
         print(cluster)
         print(cluster.dashboard_link)
-        client = Client(cluster , timeout='450s' , set_as_default=True )
+        client = Client(cluster , timeout='1000s' , set_as_default=True )
     else:
         NCORE = 50
         njobs = 1
