@@ -249,7 +249,7 @@ if __name__ == '__main__':
 
     verbose = True
     
-    distributed_computation = True
+    distributed_computation = False
     
 
     overwrite = False 
