@@ -117,12 +117,17 @@ def delayed_receive(data):
     return pickle.loads( lzma.decompress(data) )
 
 @dask.delayed(pure=False)
-def calculate_small_parsimony(tree , df  ,  bootstrap = None , position = 0 ):
+def calculate_small_parsimony(tree , pos  ,  bootstrap = None , position = 0 , alnfile = None ):
     #df is 3 columns of a codons
     #setup the tree and matrix for each worker
     sys.setrecursionlimit( 10 **9 )
-    t = pickle.loads(lzma.decompress(tree))
-    df = pickle.loads(lzma.decompress(df))
+    with open(tree , 'rb') as treein:
+        t = pickle.loads(treein.read())    
+    with h5py.File(alnfile +'.h5', 'r') as hf:
+        align_array = hf['MSA2array'] 
+        df = align_array[pos  , : ]
+
+
     #assign leaf values
     #repeat here for bootstrap
 
@@ -187,9 +192,7 @@ def calculate_small_parsimony(tree , df  ,  bootstrap = None , position = 0 ):
     retdf = pd.DataFrame.from_dict(eventdict, orient = 'index' )
     return retdf
 
-
 ###compute spares matrics from results #######################################################################
-
 @dask.delayed(pure=False)
 def compute_matrices(  resdf  ,  matsize , transitionsNT = 12 , transitionsAA = 380      ):
     count = 0
@@ -484,76 +487,74 @@ if __name__ == '__main__':
     row_index = IDindex
     count =0
     batch = 100
-    print('scattering tree to workers')
-    remote_tree = client.scatter( lzma.compress( pickle.dumps(tree) ) , broadcast=True )
+    print('saving tree')
+
+    with open( alnfile +'preptree.pkl' ,  'wb') as treeout:
+        treeout.write( pickle.dumps(tree) )
+
     print('done')
-
-
     coordinates = []
     with h5py.File(alnfile +'.h5', 'r') as hf:
         align_array = hf['MSA2array'] 
         retmatsize = ( len(tree.nodes()) ,align_array.shape[0]  )
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            for bootstrap in bootstraps:
-                for k in range(bootstrap_replicates):
-                    inlist = []
-                    count = 0 
-                    #indexing starts at 1 for blast
-                    #####switch to sending the coordinates and masking for the matrix
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for bootstrap in bootstraps:
+            for k in range(bootstrap_replicates):
+                inlist = []
+                count = 0
+                #indexing starts at 1 for blast
+                #####switch to sending the coordinates and masking for the matrix
 
-                    for i,codon in enumerate(positions):
-                        if nucleotides_only == False:
-                            pos = [column_map[codon], column_map[codon+1] , column_map[codon+2]]
-                        else:
-                            pos = [codon + i for i in range(3) if codon +i < align_array.shape[0]]
-                        
-                        res = calculate_small_parsimony( remote_tree ,  delayed_send( align_array[pos ,:] )  , bootstrap , codon )   
-
-
-                        if verbose == True:
-                            print(pos)
-
-
-                        inlist.append( res )
-                        if len(inlist) == batch:
-                            print('codon positions left to calclulate' , len(positions) - i )
-                            delayed_mats = [ compute_matrices(df, retmatsize) for df in inlist ]
-                            delayed_mats = dask.compute( * delayed_mats )
-
-                            AAbag = dask.bag.from_sequence([ m[1] for m in delayed_mats ]) 
-                            NTbag = dask.bag.from_sequence([ m[0] for m in delayed_mats ])
-                            
-                            if count ==0 :
-                                matricesAA = dask.compute(AAbag.sum())[0]
-                                matricesNT = dask.compute(NTbag.sum())[0]
-
-                            else:
-                                matricesAA += dask.compute(AAbag.sum())[0]
-                                matricesNT += dask.compute(NTbag.sum())[0]
-
-                            print(sparseND.argwhere(matricesAA))
-                            count += 1
-                            inlist =[]
-                    
-                    #last batch
-                    print('codon positions to calclulate' , len(inlist) )
-                    delayed_mats = [ compute_matrices(df, retmatsize) for df in inlist ]
-                    delayed_mats = dask.compute( *delayed_mats )
-                    AAbag = dask.bag.from_sequence([  m[1] for m in delayed_mats ]) 
-                    NTbag = dask.bag.from_sequence([ m[0] for m in delayed_mats ])
-                    matricesAA += dask.compute(AAbag.sum())[0]
-                    matricesNT += dask.compute(NTbag.sum())[0]
-                    print(matricesAA)
-                    print(matricesNT)
-                    print(sparseND.argwhere(matricesAA))
-                    print('done')
-                    if bootstrap is None:
-                        filename = alnfile +'_' + str(k) +ts+ tag  + '_coevmats.pkl' 
+                for i,codon in enumerate(positions):
+                    if nucleotides_only == False:
+                        pos = [column_map[codon], column_map[codon+1] , column_map[codon+2]]
                     else:
-                        filename = alnfile +'_' + str(k) +ts+ tag + str(bootstrap ) + '_BS_coevmats.pkl' 
-                    with open( filename , 'wb') as coevout:
-                        print(filename)
-                        print('saving',(matricesAA, matricesNT ) )
-                        coevout.write(pickle.dumps((matricesAA, matricesNT )))
-                        print('done')
+                        pos = [codon + i for i in range(3) if codon +i < align_array.shape[0]]
+                    res = calculate_small_parsimony( alnfile +'preptree.pkl' ,  pos  , bootstrap , codon , alnfile = alnfile)
+                    inlist.append( compute_matrices(res , retmatsize) )
+
+                    if verbose == True:
+                        print(pos)
+                    if len(inlist) == batch:
+                        print('codon positions left to calclulate' , len(positions) - i )
+                        #delayed_mats = dask.compute( * inlist )
+                        AAbag = dask.bag.from_delayed([ m[1] for m in inlist ]) 
+                        NTbag = dask.bag.from_delayed([ m[0] for m in inlist ])
+                        if count ==0 :
+                            matricesAA = dask.compute(AAbag.sum())[0]
+                            matricesNT = dask.compute(NTbag.sum())[0]
+                        else:
+                            matricesAA += dask.compute(AAbag.sum())[0]
+                            matricesNT += dask.compute(NTbag.sum())[0]
+                        print(sparseND.argwhere(matricesAA))
+                        count += 1
+                        
+                        with open( filename , 'wb') as coevout:
+                            print(filename)
+                            print(count, 'intermediate saving',(matricesAA, matricesNT ) )
+                            coevout.write(pickle.dumps((matricesAA, matricesNT )))
+                            print('done')
+                        inlist =[]
+                
+                #last batch
+                print('codon positions to calclulate' , len(inlist) )
+                delayed_mats = [ compute_matrices(df, retmatsize) for df in inlist ]
+                delayed_mats = dask.compute( *delayed_mats )
+                AAbag = dask.bag.from_delayed([  m[1] for m in delayed_mats ]) 
+                NTbag = dask.bag.from_delayed([ m[0] for m in delayed_mats ])
+                matricesAA += dask.compute(AAbag.sum())[0]
+                matricesNT += dask.compute(NTbag.sum())[0]
+                print(matricesAA)
+                print(matricesNT)
+                print(sparseND.argwhere(matricesAA))
+                print('done')
+                if bootstrap is None:
+                    filename = alnfile +'_' + str(k) +ts+ tag  + '_coevmats.pkl' 
+                else:
+                    filename = alnfile +'_' + str(k) +ts+ tag + str(bootstrap ) + '_BS_coevmats.pkl' 
+                with open( filename , 'wb') as coevout:
+                    print(filename)
+                    print('saving',(matricesAA, matricesNT ) )
+                    coevout.write(pickle.dumps((matricesAA, matricesNT )))
+                    print('done')
