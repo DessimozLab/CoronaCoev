@@ -61,6 +61,7 @@ def process_node_smallpars_1(node):
 
                 
 def process_node_smallpars_2(node , verbose = False):
+    
     #assign the most parsimonious char from children
     if node.char is None:
         if node.parent_node:
@@ -249,7 +250,7 @@ if __name__ == '__main__':
 
     verbose = True
     
-    distributed_computation = False
+    distributed_computation = True
     
 
     overwrite = False 
@@ -498,9 +499,21 @@ if __name__ == '__main__':
         align_array = hf['MSA2array'] 
         retmatsize = ( len(tree.nodes()) ,align_array.shape[0]  )
     with warnings.catch_warnings():
+
         warnings.simplefilter("ignore")
+
+
+
         for bootstrap in bootstraps:
+            
+            
             for k in range(bootstrap_replicates):
+
+                if bootstrap is None:
+                    filename = alnfile +'_' + str(k) +ts+ tag  + '_coevmats.pkl' 
+                else:
+                    filename = alnfile +'_' + str(k) +ts+ tag + str(bootstrap ) + '_BS_coevmats.pkl' 
+                
                 inlist = []
                 count = 0
                 #indexing starts at 1 for blast
@@ -516,11 +529,14 @@ if __name__ == '__main__':
 
                     if verbose == True:
                         print(pos)
-                    if len(inlist) == batch:
+
+                    if len(inlist) == NCORE*njobs:
                         print('codon positions left to calclulate' , len(positions) - i )
-                        #delayed_mats = dask.compute( * inlist )
-                        AAbag = dask.bag.from_delayed([ m[1] for m in inlist ]) 
-                        NTbag = dask.bag.from_delayed([ m[0] for m in inlist ])
+                        delayed_mats = dask.compute( * inlist )
+                        if verbose == True:
+                            print(delayed_mats)
+                        AAbag = dask.bag.from_sequence([ m[1] for m in delayed_mats ]) 
+                        NTbag = dask.bag.from_sequence([ m[0] for m in delayed_mats ])
                         if count ==0 :
                             matricesAA = dask.compute(AAbag.sum())[0]
                             matricesNT = dask.compute(NTbag.sum())[0]
@@ -549,10 +565,7 @@ if __name__ == '__main__':
                 print(matricesNT)
                 print(sparseND.argwhere(matricesAA))
                 print('done')
-                if bootstrap is None:
-                    filename = alnfile +'_' + str(k) +ts+ tag  + '_coevmats.pkl' 
-                else:
-                    filename = alnfile +'_' + str(k) +ts+ tag + str(bootstrap ) + '_BS_coevmats.pkl' 
+
                 with open( filename , 'wb') as coevout:
                     print(filename)
                     print('saving',(matricesAA, matricesNT ) )
