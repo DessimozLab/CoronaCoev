@@ -8,8 +8,7 @@
 #SBATCH --output=master_slurm.out
 
 
-
-source /work/FAC/FBM/DBC/cdessim2/default/dmoi/miniconda/etc/profile.d/conda.sh
+source /work/FAC/FBM/DBC/cdessim2/default/dmoi/condaenvs/etc/profile.d/conda.sh
 
 conda activate ML2
 # Run Jupyter

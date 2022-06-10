@@ -61,7 +61,6 @@ def process_node_smallpars_1(node):
 
                 
 def process_node_smallpars_2(node , verbose = False):
-    
     #assign the most parsimonious char from children
     if node.char is None:
         if node.parent_node:
@@ -109,107 +108,107 @@ def process_node_smallpars_2(node , verbose = False):
             if child.char is None:
                 process_node_smallpars_2(child)
 
-@dask.delayed(pure=False)
-def delayed_send(data):
-    return lzma.compress(pickle.dumps(data))
 
-@dask.delayed(pure=False)
-def delayed_receive(data):
-    return pickle.loads( lzma.decompress(data) )
-
-@dask.delayed(pure=False)
-def calculate_small_parsimony(tree ,  posvec  ,  bootstrap = None , position = 0 , alnfile = None ):
+def calculate_small_parsimony( positionq  ,  bootstrap = None , position = 0 , alnfile = None , tree = None ):
     #df is 3 columns of a codons
     #setup the tree and matrix for each worker
+
     sys.setrecursionlimit( 10 **9 )
     with open(tree , 'rb') as treein:
-        t = pickle.loads(treein.read())    
-    
-    #assign leaf values
-    #repeat here for bootstrap
+        tree = pickle.loads(treein.read())    
+    with h5py.File(alnfile +'.h5', 'r') as hf:
+        align_array = hf['MSA2array'] 
 
-    if bootstrap is not None :
-        #select portion of random genomes to take out
-        del_genomes = set(np.random.randint( len(t.leaf_nodes()) , size= int( len(t.leaf_nodes()) *bootstrap) ) )
-    else:
-        del_genomes = set([])
-    retdfs = []
-    
+    while True:
+        pos = positionq.get()
+        df = align_array[pos  , : ]
+        t= copy.deepcopy(tree)
 
+        #assign leaf values
+        #repeat here for bootstrap
+        if bootstrap is not None :
+            #select portion of random genomes to take out
+            del_genomes = set(np.random.randint( len(t.leaf_nodes()) , size= int( len(t.leaf_nodes()) *bootstrap) ) )
+        else:
+            del_genomes = set([])
 
-    #change a subset of leaves to ambiguous characters
-    for idx in posvec:
-        with h5py.File(alnfile +'.h5', 'r') as hf:
-            align_array = hf['MSA2array'] 
-            df = align_array[idx  , : ]
+        #change a subset of leaves to ambiguous characters
+        codon_pos = 0
         alnmax = df.shape[1]
-        for codonpos in [0,1,2]:
-            alncol = df[codonpos , : ]
+        for idx in range(df.shape[0]):
+            alncol = df[idx , : ]
             for l in t.leaf_nodes():
                 #setup for small_pars1
-                l.calc[codonpos] = True
-                l.event[codonpos] = 0
-                l.scores[codonpos] = { c:10**10 for c in allowed_symbols }
-                l.symbols[codonpos] =  allowed_symbols
+                l.calc[codon_pos] = True
+                l.event[codon_pos] = 0
+                l.scores[codon_pos] = { c:10**10 for c in allowed_symbols }
+                l.symbols[codon_pos] =  allowed_symbols
+                
                 if l.aln_row and l.aln_row < alnmax and l.aln_row not in del_genomes:
 
                     char = alncol[ l.aln_row ]
 
                     if char.upper() in allowed_symbols:
-                        l.symbols[codonpos] = { char }
-                        l.scores[codonpos][char] = 0
+                        l.symbols[codon_pos] = { char }
+                        l.scores[codon_pos][char] = 0
                     else:
                         char = None
-                        l.symbols[codonpos] =  allowed_symbols
+                        l.symbols[codon_pos] =  allowed_symbols
                 else:
                     char = None
-                    l.symbols[codonpos] =  allowed_symbols
-                l.char[codonpos] = min(l.scores[codonpos], key=l.scores[codonpos].get)
+                    l.symbols[codon_pos] =  allowed_symbols
+                l.char[codon_pos] = min(l.scores[codon_pos], key=l.scores[codon_pos].get)
+            codon_pos+=1
         #upq
+        
+
         process_node_smallpars_1(t.seed_node)
         #down
+        
         process_node_smallpars_2(t.seed_node)
+        
+
         #collect events
         eventdict = {}
         AAeventindex = [ n.matrow for n in t.nodes() if n.AAevent  ]
         AAeventypes = [ n.AAevent for n in t.nodes() if n.AAevent  ]
-        for codonpos,i in enumerate(t.seed_node.char):
-            eventindex = [ n.matrow for n in t.nodes() if n.event[codonpos] > 0 ]
-            eventtypes = [ n.eventype[codonpos] for n in t.nodes() if n.event[codonpos] > 0 ]
+        for codon_pos,i in enumerate(t.seed_node.char):
+            eventindex = [ n.matrow for n in t.nodes() if n.event[codon_pos] > 0 ]
+            eventtypes = [ n.eventype[codon_pos] for n in t.nodes() if n.event[codon_pos] > 0 ]
 
-            if codonpos==0:
+
+            if codon_pos==0:
                 eventdict[i] = { 'type': eventtypes , 'index' : eventindex , 'AAeventindex':AAeventindex , 'AAeventypes': AAeventypes  }
+            
             else:
                 eventdict[i] = { 'type': eventtypes , 'index' : eventindex , 'AAeventindex':[] , 'AAeventypes': [] }
 
 
-            eventdict[i]['codon_pos'] = codonpos
-            eventdict[i]['column'] = idx[0] + codonpos
+            eventdict[i]['codon_pos'] = codon_pos
+            eventdict[i]['column'] = position + codon_pos
         retdf = pd.DataFrame.from_dict(eventdict, orient = 'index' )
-        retdfs.append(retdf)
-    return retdfs
+    return retdf
 
 ###compute spares matrics from results #######################################################################
 @dask.delayed(pure=False)
-def compute_matrices(  retdfs  ,  matsize , transitionsNT = 12 , transitionsAA = 380      ):
+def compute_matrices(  resdf  ,  matsize , transitionsNT = 12 , transitionsAA = 380      ):
     count = 0
     AA_mutation = None
     nucleotide_mutation = None
-    for resdf in retdfs:
-        for idx,row in resdf.iterrows():
-            #get next job completed
-            eventtypes , eventindex , AAeventindex , AAeventypes= row[['type' , 'index' , 'AAeventindex' , 'AAeventypes']]
-            eventtypes , eventindex , AAeventindex , AAeventypes = [ list(a)  for a in [eventtypes , eventindex , AAeventindex , AAeventypes ] ]
-            #save each position to event mats
-            col = row.column
-            if nucleotide_mutation is not None:
-                nucleotide_mutation  += sparseND.COO( coords =  ( eventindex  , [ col for i in range(len(eventindex)) ]  , eventtypes ) , data = np.ones( len(eventindex) ) , shape = (matsize[0] , matsize[1] , transitionsNT)  )
-            else:
-                nucleotide_mutation  =  sparseND.COO( coords = ( eventindex ,  [ col for i in range(len(eventindex)) ]    , eventtypes ) , data = np.ones( len(eventindex) ) , shape = (matsize[0] , matsize[1] , transitionsNT )  )
-            if AA_mutation  is not None:
-                AA_mutation  += sparseND.COO( coords =  ( AAeventindex ,  [ col for i in range(len(AAeventindex)) ]   , AAeventypes ) , data = np.ones(len(AAeventindex)  ) , shape = (matsize[0] , matsize[1] , transitionsAA )   )
-            else:
-                AA_mutation  = sparseND.COO( coords =  ( AAeventindex ,  [ col for i in range(len(AAeventindex)) ]  , AAeventypes ) , data = np.ones(len(AAeventindex)    ) , shape = (matsize[0] , matsize[1] , transitionsAA )   )
+    for idx,row in resdf.iterrows():
+        #get next job completed
+        eventtypes , eventindex , AAeventindex , AAeventypes= row[['type' , 'index' , 'AAeventindex' , 'AAeventypes']]
+        eventtypes , eventindex , AAeventindex , AAeventypes = [ list(a)  for a in [eventtypes , eventindex , AAeventindex , AAeventypes ] ]
+        #save each position to event mats
+        col = row.column
+        if nucleotide_mutation is not None:
+            nucleotide_mutation  += sparseND.COO( coords =  ( eventindex  , [ col for i in range(len(eventindex)) ]  , eventtypes ) , data = np.ones( len(eventindex) ) , shape = (matsize[0] , matsize[1] , transitionsNT)  )
+        else:
+            nucleotide_mutation  =  sparseND.COO( coords = ( eventindex ,  [ col for i in range(len(eventindex)) ]    , eventtypes ) , data = np.ones( len(eventindex) ) , shape = (matsize[0] , matsize[1] , transitionsNT )  )
+        if AA_mutation  is not None:
+            AA_mutation  += sparseND.COO( coords =  ( AAeventindex ,  [ col for i in range(len(AAeventindex)) ]   , AAeventypes ) , data = np.ones(len(AAeventindex)  ) , shape = (matsize[0] , matsize[1] , transitionsAA )   )
+        else:
+            AA_mutation  = sparseND.COO( coords =  ( AAeventindex ,  [ col for i in range(len(AAeventindex)) ]  , AAeventypes ) , data = np.ones(len(AAeventindex)    ) , shape = (matsize[0] , matsize[1] , transitionsAA )   )
     return  nucleotide_mutation, AA_mutation
 
 
@@ -446,31 +445,25 @@ if __name__ == '__main__':
 
     print('flashing up a dask cluster')
     if distributed_computation == True:
-        NCORE = 2
-        njobs = 100
-
+        NCORE = 3
+        njobs = 50
         print('deploying cluster')
         cluster = SLURMCluster(
             walltime='8:00:00',
-            n_workers = njobs,
+            n_workers = NCORE,
             cores=NCORE,
             processes = NCORE,
             interface='ib0',
-            memory="120GB" ,
+            memory="200GB",
             env_extra=[
             'source /work/FAC/FBM/DBC/cdessim2/default/dmoi/miniconda/etc/profile.d/conda.sh',
             'conda activate ML2'
             ],
             scheduler_options={'interface': 'ens2f0' }
         )
-
-
         print(cluster.job_script())
         #cluster.adapt(minimum=10, maximum=30)
-        #cluster.scale(jobs=njobs)
-
-        cluster.adapt(minimum=80, maximum=200)
-
+        cluster.scale(jobs=njobs)
         time.sleep(5)
         print(cluster)
         print(cluster.dashboard_link)
@@ -492,8 +485,18 @@ if __name__ == '__main__':
     count =0
     batch = 100
     print('saving tree')
+
     with open( alnfile +'preptree.pkl' ,  'wb') as treeout:
         treeout.write( pickle.dumps(tree) )
+
+
+    #create q
+
+    #fire and forget worker processes 
+
+
+
+
 
     print('done')
     coordinates = []
@@ -503,18 +506,8 @@ if __name__ == '__main__':
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         for bootstrap in bootstraps:
-            
-            
             for k in range(bootstrap_replicates):
-
-                if bootstrap is None:
-                    filename = alnfile +'_' + str(k) +ts+ tag  + '_coevmats.pkl' 
-                else:
-                    filename = alnfile +'_' + str(k) +ts+ tag + str(bootstrap ) + '_BS_coevmats.pkl' 
-                
-                fitch_inlist = []
-                positions_batch = []
-                codonbatch = 20
+                inlist = []
                 count = 0
                 #indexing starts at 1 for blast
                 #####switch to sending the coordinates and masking for the matrix
@@ -524,22 +517,19 @@ if __name__ == '__main__':
                         pos = [column_map[codon], column_map[codon+1] , column_map[codon+2]]
                     else:
                         pos = [codon + i for i in range(3) if codon +i < align_array.shape[0]]
-                    
-                    positions_batch.append(pos)
-                    if len(positions_batch)>codonbatch:
-                        res = calculate_small_parsimony( alnfile +'preptree.pkl' ,  positions_batch  , bootstrap , codon , alnfile = alnfile)
-                        fitch_inlist.append( compute_matrices(res , retmatsize) )
-                        positions_batch = []
+                    q.put()
 
-                    
 
-                    if len(fitch_inlist) == NCORE*njobs:
+                    #res = calculate_small_parsimony( alnfile +'preptree.pkl' ,  pos  , bootstrap , codon , alnfile = alnfile)
+                    #inlist.append( compute_matrices(res , retmatsize) )
+
+                    if verbose == True:
+                        print(pos)
+                    if len(inlist) == batch:
                         print('codon positions left to calclulate' , len(positions) - i )
-                        delayed_mats = dask.compute( * fitch_inlist )
-                        if verbose == True:
-                            print(delayed_mats)
-                        AAbag = dask.bag.from_sequence([ m[1] for m in delayed_mats ]) 
-                        NTbag = dask.bag.from_sequence([ m[0] for m in delayed_mats ])
+                        #delayed_mats = dask.compute( * inlist )
+                        AAbag = dask.bag.from_delayed([ m[1] for m in inlist ]) 
+                        NTbag = dask.bag.from_delayed([ m[0] for m in inlist ])
                         if count ==0 :
                             matricesAA = dask.compute(AAbag.sum())[0]
                             matricesNT = dask.compute(NTbag.sum())[0]
@@ -554,11 +544,11 @@ if __name__ == '__main__':
                             print(count, 'intermediate saving',(matricesAA, matricesNT ) )
                             coevout.write(pickle.dumps((matricesAA, matricesNT )))
                             print('done')
-                        fitch_inlist =[]
+                        inlist =[]
                 
                 #last batch
-                print('codon positions to calclulate' , len(fitch_inlist) )
-                delayed_mats = [ compute_matrices(df, retmatsize) for df in fitch_inlist ]
+                print('codon positions to calclulate' , len(inlist) )
+                delayed_mats = [ compute_matrices(df, retmatsize) for df in inlist ]
                 delayed_mats = dask.compute( *delayed_mats )
                 AAbag = dask.bag.from_delayed([  m[1] for m in delayed_mats ]) 
                 NTbag = dask.bag.from_delayed([ m[0] for m in delayed_mats ])
@@ -568,7 +558,10 @@ if __name__ == '__main__':
                 print(matricesNT)
                 print(sparseND.argwhere(matricesAA))
                 print('done')
-
+                if bootstrap is None:
+                    filename = alnfile +'_' + str(k) +ts+ tag  + '_coevmats.pkl' 
+                else:
+                    filename = alnfile +'_' + str(k) +ts+ tag + str(bootstrap ) + '_BS_coevmats.pkl' 
                 with open( filename , 'wb') as coevout:
                     print(filename)
                     print('saving',(matricesAA, matricesNT ) )
