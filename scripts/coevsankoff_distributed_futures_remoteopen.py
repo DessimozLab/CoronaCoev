@@ -25,6 +25,8 @@ from dask.distributed import  utils_perf , as_completed
 import gc
 import dask
 import dask.bag as db
+from dask.distributed import as_completed
+
 import dask.array as da
 import dask.dataframe as dd
 from dask.delayed import delayed
@@ -34,6 +36,7 @@ from datetime import datetime, timedelta
 
 
 import warnings
+
 
 
 ####small parsimony functions ##########
@@ -502,7 +505,6 @@ if __name__ == '__main__':
                 else:
                     filename = alnfile +'_' + str(k) +ts+ tag + str(bootstrap ) + '_BS_coevmats.pkl' 
                 
-
                 positions_batch = []
                 futures = []
                 codonbatch = 10

@@ -31,9 +31,11 @@ from dask.delayed import delayed
 from dask import delayed, compute
 import argparse
 from datetime import datetime, timedelta
-
-
 import warnings
+from functools import wraps
+
+
+
 
 
 ####small parsimony functions ##########
@@ -117,6 +119,7 @@ def delayed_send(data):
 def delayed_receive(data):
     return pickle.loads( lzma.decompress(data) )
 
+
 @dask.delayed(pure=False)
 def calculate_small_parsimony(tree ,  posvec  ,  bootstrap = None , position = 0 , alnfile = None ):
     #df is 3 columns of a codons
@@ -176,13 +179,10 @@ def calculate_small_parsimony(tree ,  posvec  ,  bootstrap = None , position = 0
         for codonpos,i in enumerate(t.seed_node.char):
             eventindex = [ n.matrow for n in t.nodes() if n.event[codonpos] > 0 ]
             eventtypes = [ n.eventype[codonpos] for n in t.nodes() if n.event[codonpos] > 0 ]
-
             if codonpos==0:
                 eventdict[i] = { 'type': eventtypes , 'index' : eventindex , 'AAeventindex':AAeventindex , 'AAeventypes': AAeventypes  }
             else:
                 eventdict[i] = { 'type': eventtypes , 'index' : eventindex , 'AAeventindex':[] , 'AAeventypes': [] }
-
-
             eventdict[i]['codon_pos'] = codonpos
             eventdict[i]['column'] = idx[0] + codonpos
         retdf = pd.DataFrame.from_dict(eventdict, orient = 'index' )
@@ -446,7 +446,7 @@ if __name__ == '__main__':
 
     print('flashing up a dask cluster')
     if distributed_computation == True:
-        NCORE = 2
+        NCORE = 1
         njobs = 100
 
         print('deploying cluster')
@@ -456,9 +456,9 @@ if __name__ == '__main__':
             cores=NCORE,
             processes = NCORE,
             interface='ib0',
-            memory="120GB" ,
+            memory="150GB" ,
             env_extra=[
-            'source /work/FAC/FBM/DBC/cdessim2/default/dmoi/miniconda/etc/profile.d/conda.sh',
+            'source /work/FAC/FBM/DBC/cdessim2/default/dmoi/condaenvs/etc/profile.d/conda.sh',
             'conda activate ML2'
             ],
             scheduler_options={'interface': 'ens2f0' }
@@ -466,11 +466,8 @@ if __name__ == '__main__':
 
 
         print(cluster.job_script())
-        #cluster.adapt(minimum=10, maximum=30)
         #cluster.scale(jobs=njobs)
-
-        cluster.adapt(minimum=80, maximum=200)
-
+        cluster.adapt(minimum=80, maximum=1000)
         time.sleep(5)
         print(cluster)
         print(cluster.dashboard_link)
@@ -514,11 +511,13 @@ if __name__ == '__main__':
                 
                 fitch_inlist = []
                 positions_batch = []
-                codonbatch = 20
-                count = 0
+
+
+                computebatch = 200
+                codonbatch = 3
+
                 #indexing starts at 1 for blast
                 #####switch to sending the coordinates and masking for the matrix
-
                 for i,codon in enumerate(positions):
                     if nucleotides_only == False:
                         pos = [column_map[codon], column_map[codon+1] , column_map[codon+2]]
@@ -531,11 +530,18 @@ if __name__ == '__main__':
                         fitch_inlist.append( compute_matrices(res , retmatsize) )
                         positions_batch = []
 
-                    
-
-                    if len(fitch_inlist) == NCORE*njobs:
+                    if len(fitch_inlist) == 200:
                         print('codon positions left to calclulate' , len(positions) - i )
-                        delayed_mats = dask.compute( * fitch_inlist )
+                        compute_count = 0
+                        while True:
+                            try:
+                                print('computing')
+                                delayed_mats = dask.compute( * fitch_inlist , retries = 100)
+                                print('done')
+                                break
+                            except :
+                                print('retrying')
+
                         if verbose == True:
                             print(delayed_mats)
                         AAbag = dask.bag.from_sequence([ m[1] for m in delayed_mats ]) 
@@ -559,7 +565,7 @@ if __name__ == '__main__':
                 #last batch
                 print('codon positions to calclulate' , len(fitch_inlist) )
                 delayed_mats = [ compute_matrices(df, retmatsize) for df in fitch_inlist ]
-                delayed_mats = dask.compute( *delayed_mats )
+                delayed_mats = dask.compute( *delayed_mats , retries = 100 )
                 AAbag = dask.bag.from_delayed([  m[1] for m in delayed_mats ]) 
                 NTbag = dask.bag.from_delayed([ m[0] for m in delayed_mats ])
                 matricesAA += dask.compute(AAbag.sum())[0]
