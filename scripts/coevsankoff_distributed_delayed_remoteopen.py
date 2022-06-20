@@ -137,9 +137,6 @@ def calculate_small_parsimony(tree ,  posvec  ,  bootstrap = None , position = 0
     else:
         del_genomes = set([])
     retdfs = []
-    
-
-
     #change a subset of leaves to ambiguous characters
     for idx in posvec:
         with h5py.File(alnfile +'.h5', 'r') as hf:
@@ -223,6 +220,8 @@ if __name__ == '__main__':
     sys.setrecursionlimit( 10 **8 )
     ts = datetime.utcnow().isoformat()
 
+
+    '''
     parser=argparse.ArgumentParser()
     parser.add_argument('--tree', help='tree corresponding to the alignment',type = str)
     parser.add_argument('--aln', help='alignment corresponding to the tree',type = str)
@@ -232,27 +231,80 @@ if __name__ == '__main__':
     parser.add_argument('--overwrite', help='overwrite HDF5 of aln' , type = str)
     parser.add_argument('--verbose', help='overwrite HDF5 of aln' , type = str)
 
+    parser.add_argument('--reload', help='overwrite HDF5 of aln' , type = str)
+    parser.add_argument('--njobs', help='overwrite HDF5 of aln' , type = str)
+
+
     args = vars(parser.parse_args(sys.argv[1:]))
 
+
+
+
+    if args['tree']:
+        treefile = args['tree']
+    if args['aln']:
+        alnfile = args['aln']
+    if args['blastpath']:
+        taxfilter = args['blastpath']
+    if args['refproteome']:
+        taxmask = args['refproteome']
+
+    if args['reload']:
+        reload_file = args['reload']
+
+    if args['reload']:
+        reload_file = args['reload']
+    if args['reload']:
+        taxmask = args['refproteome']
+    if args['distributed']:
+        if args['distributed'] == 'True':
+            distributed_computation = True
+        else:
+            distributed_computation = False
+
+    if args['distributed']:
+        if args['distributed'] == 'True':
+            distributed_computation = True
+            njobs = 200
+        else:
+            distributed_computation = False
+            njobs = 10
+
+    if args['njobs']:
+            njobs = int(args['njobs'])
+
     print(args)
+
+    '''
+
     print('timestamp',ts)
     tag = 'small_test'
 
     #fraction of genomes to remove if jackknifing
     #bootstraps = [ .001 , .01, .1 , .5  ,  .9  , .99    ]
-    bootstraps = [ .25  ]
-    bootstrap_replicates = 5
+    bootstraps = [ None , .25  ]
+    bootstrap_replicates = [1 , 5]
 
     #defaults
 
     verbose = True
     
     distributed_computation = True
-    
+    njobs = 200 
+
 
     overwrite = False 
     overwrite_annot = False
     overwrite_index = False
+
+
+    #restart computation after failure
+    #reload_file = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/apr_4_2022/mmsa_2022-04-04/2022-04-04_masked.fa_02022-06-13T22:03:53.971781small_test_coevmats.pkl'
+    #startposition = 15708
+
+    reload_file = None
+    startposition = 0
+
 
     #number of replicates
     restart = None
@@ -262,8 +314,11 @@ if __name__ == '__main__':
     refproteodb = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/refproteome/covidrefproteome.fasta'
     #refproteodb = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/structs/covid_structs.fasta'
 
+
     alnfile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/apr_4_2022/mmsa_2022-04-04/2022-04-04_masked.fa'
-    treefile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/apr_4_2022/GISAID-hCoV-19-phylogeny-2022-02-28/global.tree'
+    #treefile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/apr_4_2022/GISAID-hCoV-19-phylogeny-2022-02-28/global.tree'
+    
+    treefile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/feb_2021/GISAID-hCoV-19-phylogeny-2021-02-21/global.tree'
 
     #alnfile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/dec_7/2021-12-07_masked.fa'
     #treefile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/dec_7/global.tree'
@@ -280,20 +335,6 @@ if __name__ == '__main__':
     #treefile = '../validation_data/16s/16s_salaminWstruct_aln.fasta.treefile'
     #alnfile = '../validation_data/16s/16s_salaminWstruct_aln.fasta'
 
-
-    if args['tree']:
-        treefile = args['tree']
-    if args['aln']:
-        alnfile = args['aln']
-    if args['blastpath']:
-        taxfilter = args['blastpath']
-    if args['refproteome']:
-        taxmask = args['refproteome']
-    if args['distributed']:
-        if args['distributed'] == 'True':
-            distributed_computation = True
-        else:
-            distributed_computation = False
 
     #create distributed cluster
     #use blast based annotation to assign codons to column ranges
@@ -444,30 +485,32 @@ if __name__ == '__main__':
         annotation = pd.DataFrame.from_dict( dummy_annot , orient = 'index')
         positions = [ i for i in range(1,align_array.shape[0], 3 ) ]
 
+    positions = sorted(list(set(positions)))
+    print(annotation)
+    print( 'calcilating sankof on positions', positions[0:500] , '...' )
+    print('codons to calclulate:' , len(positions))
     print('flashing up a dask cluster')
     if distributed_computation == True:
-        NCORE = 1
-        njobs = 100
 
+
+        NCORE = 1
         print('deploying cluster')
         cluster = SLURMCluster(
-            walltime='8:00:00',
+            walltime='1:00:00',
             n_workers = njobs,
             cores=NCORE,
             processes = NCORE,
             interface='ib0',
-            memory="150GB" ,
+            memory="10GB" ,
             env_extra=[
             'source /work/FAC/FBM/DBC/cdessim2/default/dmoi/condaenvs/etc/profile.d/conda.sh',
             'conda activate ML2'
             ],
             scheduler_options={'interface': 'ens2f0' }
         )
-
-
         print(cluster.job_script())
         #cluster.scale(jobs=njobs)
-        cluster.adapt(minimum=80, maximum=1000)
+        cluster.adapt(minimum=njobs, maximum=1000)
         time.sleep(5)
         print(cluster)
         print(cluster.dashboard_link)
@@ -475,9 +518,8 @@ if __name__ == '__main__':
         
     else:
         NCORE = 50
-        njobs = 1
         print('testing')
-        cluster = LocalCluster(n_workers = NCORE )
+        cluster = LocalCluster(n_workers = njobs )
         #cluster.adapt(minimum = 50,  maximum=NCORE)
         print(cluster.dashboard_link)
         client = Client(cluster)
@@ -487,96 +529,144 @@ if __name__ == '__main__':
     print('starting sankof')
     row_index = IDindex
     count =0
-    batch = 100
     print('saving tree')
     with open( alnfile +'preptree.pkl' ,  'wb') as treeout:
         treeout.write( pickle.dumps(tree) )
 
     print('done')
     coordinates = []
+    while len(client.scheduler_info()['workers']) < 10:
+        time.sleep(5)
+        print('waiting for workers')
+
     with h5py.File(alnfile +'.h5', 'r') as hf:
         align_array = hf['MSA2array'] 
         retmatsize = ( len(tree.nodes()) ,align_array.shape[0]  )
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        for bootstrap in bootstraps:
-            
-            
-            for k in range(bootstrap_replicates):
+        for bs , bootstrap in enumerate(bootstraps):
+            this_bootstrap_replicates = bootstrap_replicates[bs]
+            for k in range(this_bootstrap_replicates):
 
-                if bootstrap is None:
-                    filename = alnfile +'_' + str(k) +ts+ tag  + '_coevmats.pkl' 
+                if reload_file == None:
+                    if bootstrap is None:
+                        filename = alnfile +'_' + str(k) +ts+ tag  + '_coevmats.pkl' 
+                    else:
+                        filename = alnfile +'_' + str(k) +ts+ tag + str(bootstrap ) + '_BS_coevmats.pkl' 
                 else:
-                    filename = alnfile +'_' + str(k) +ts+ tag + str(bootstrap ) + '_BS_coevmats.pkl' 
-                
+                    filename = reload_file
+                    with open( filename , 'rb') as coevout:
+                        print('reloading' , filename)
+                        matricesAA, matricesNT  = pickle.loads( coevout.read() )
+                        print('loaded',(matricesAA, matricesNT ) )
+                print('working on ', filename)
                 fitch_inlist = []
                 positions_batch = []
 
+               
 
-                computebatch = 200
-                codonbatch = 3
+                with open( filename+'.logfile.txt' , 'w') as logout:
+                    logout.write('cluster link')
+                    logout.write(cluster.dashboard_link)
+                    logout.flush()
 
-                #indexing starts at 1 for blast
-                #####switch to sending the coordinates and masking for the matrix
-                for i,codon in enumerate(positions):
-                    if nucleotides_only == False:
-                        pos = [column_map[codon], column_map[codon+1] , column_map[codon+2]]
-                    else:
-                        pos = [codon + i for i in range(3) if codon +i < align_array.shape[0]]
-                    
-                    positions_batch.append(pos)
-                    if len(positions_batch)>codonbatch:
-                        res = calculate_small_parsimony( alnfile +'preptree.pkl' ,  positions_batch  , bootstrap , codon , alnfile = alnfile)
-                        fitch_inlist.append( compute_matrices(res , retmatsize) )
-                        positions_batch = []
+                    computebatch = len(client.scheduler_info()['workers'])*NCORE
+                    codonbatch = 3
+                    #indexing starts at 1 for blast
+                    #####switch to sending the coordinates and masking for the matrix
+                    for i,codon in enumerate(positions):
+                        if ( reload_file is not None and len(positions) - i < startposition ) or reload_file is None:
+                            if nucleotides_only == False:
+                                pos = [column_map[codon], column_map[codon+1] , column_map[codon+2]]
+                            else:
+                                pos = [codon + i for i in range(3) if codon +i < align_array.shape[0]]
+                            positions_batch.append(pos)
+                            if len(positions_batch)>codonbatch:
+                                res = calculate_small_parsimony( alnfile +'preptree.pkl' ,  positions_batch  , bootstrap , codon , alnfile = alnfile)
+                                fitch_inlist.append( compute_matrices(res , retmatsize) )
+                                positions_batch = []
 
-                    if len(fitch_inlist) == 200:
-                        print('codon positions left to calclulate' , len(positions) - i )
-                        compute_count = 0
-                        while True:
-                            try:
-                                print('computing')
-                                delayed_mats = dask.compute( * fitch_inlist , retries = 100)
-                                print('done')
-                                break
-                            except :
-                                print('retrying')
 
-                        if verbose == True:
-                            print(delayed_mats)
-                        AAbag = dask.bag.from_sequence([ m[1] for m in delayed_mats ]) 
-                        NTbag = dask.bag.from_sequence([ m[0] for m in delayed_mats ])
-                        if count ==0 :
-                            matricesAA = dask.compute(AAbag.sum())[0]
-                            matricesNT = dask.compute(NTbag.sum())[0]
-                        else:
-                            matricesAA += dask.compute(AAbag.sum())[0]
-                            matricesNT += dask.compute(NTbag.sum())[0]
-                        print(sparseND.argwhere(matricesAA))
-                        count += 1
-                        
-                        with open( filename , 'wb') as coevout:
-                            print(filename)
-                            print(count, 'intermediate saving',(matricesAA, matricesNT ) )
-                            coevout.write(pickle.dumps((matricesAA, matricesNT )))
+                           
+
+                            if len(fitch_inlist) == computebatch: 
+
+
+                                logout.write('computing')
+                                logout.write('positions up to:'+str(codon))
+                                logout.write('codons up to:'+str(i))
+                                logout.flush()
+                                print('codon positions left to calclulate' , len(positions) - i )
+                                compute_count = 0
+                                while True:
+                                    try:
+                                        print('computing')
+                                        delayed_mats = dask.compute( * fitch_inlist , retries = 100)
+                                        print('done')
+                                        logout.write('success' )
+                                        logout.write('retry :' + str(compute_count) )
+                                        logout.flush()
+                                        break
+                                    except :
+                                        logout.write('batch failure' )
+                                        logout.write('retry :' + str(compute_count) )
+                                        logout.flush()
+                                        time.sleep(5)
+
+                                        compute_count +=1
+                                        print('retrying')
+                                AAbag = dask.bag.from_sequence([ m[1] for m in delayed_mats ]) 
+                                NTbag = dask.bag.from_sequence([ m[0] for m in delayed_mats ])
+                                if count ==0 :
+                                    matricesAA = dask.compute(AAbag.sum())[0]
+                                    matricesNT = dask.compute(NTbag.sum())[0]
+                                else:
+                                    matricesAA += dask.compute(AAbag.sum())[0]
+                                    matricesNT += dask.compute(NTbag.sum())[0]
+                                print(sparseND.argwhere(matricesAA))
+                                count += 1
+                                with open( filename , 'wb') as coevout:
+                                    print(filename)
+                                    print(count, 'intermediate saving',(matricesAA, matricesNT ) )
+                                    coevout.write(pickle.dumps((matricesAA, matricesNT )))
+                                    print('done')
+                                fitch_inlist =[]
+                                #adjust batchsize on cluster scaling
+                                computebatch = len(client.scheduler_info()['workers'])*NCORE
+                    #last batch
+                    print('codon positions to calclulate' , len(fitch_inlist) )
+                    delayed_mats = [ compute_matrices(df, retmatsize) for df in fitch_inlist ]
+                    compute_count = 0
+                    while True:
+                        try:
+                            print('computing')
+                            delayed_mats = dask.compute( * fitch_inlist , retries = 100)
                             print('done')
-                        fitch_inlist =[]
-                
-                #last batch
-                print('codon positions to calclulate' , len(fitch_inlist) )
-                delayed_mats = [ compute_matrices(df, retmatsize) for df in fitch_inlist ]
-                delayed_mats = dask.compute( *delayed_mats , retries = 100 )
-                AAbag = dask.bag.from_delayed([  m[1] for m in delayed_mats ]) 
-                NTbag = dask.bag.from_delayed([ m[0] for m in delayed_mats ])
-                matricesAA += dask.compute(AAbag.sum())[0]
-                matricesNT += dask.compute(NTbag.sum())[0]
-                print(matricesAA)
-                print(matricesNT)
-                print(sparseND.argwhere(matricesAA))
-                print('done')
+                            logout.write('success' )
+                            logout.write('retry :' + str(compute_count) )
+                            logout.flush()
+                            break
+                        except :
+                            logout.write('batch failure' )
+                            logout.write('retry :' + str(compute_count) )
+                            logout.flush()
+                            time.sleep(5)
 
-                with open( filename , 'wb') as coevout:
-                    print(filename)
-                    print('saving',(matricesAA, matricesNT ) )
-                    coevout.write(pickle.dumps((matricesAA, matricesNT )))
+                            compute_count +=1
+                            print('retrying')
+
+                    AAbag = dask.bag.from_delayed([  m[1] for m in delayed_mats ]) 
+                    NTbag = dask.bag.from_delayed([ m[0] for m in delayed_mats ])
+                    matricesAA += dask.compute(AAbag.sum())[0]
+                    matricesNT += dask.compute(NTbag.sum())[0]
+                    print(matricesAA)
+                    print(matricesNT)
+                    print(sparseND.argwhere(matricesAA))
                     print('done')
+
+                    with open( filename , 'wb') as coevout:
+                        print(filename)
+                        print('saving',(matricesAA, matricesNT ) )
+                        coevout.write(pickle.dumps((matricesAA, matricesNT )))
+                        print('done')
+                    print('DONE!')
