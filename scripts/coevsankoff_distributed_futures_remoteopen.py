@@ -18,36 +18,47 @@ import itertools
 import pdb
 import lzma
 
-from dask.distributed import fire_and_forget
+from dask.distributed import fire_and_forget , secede, rejoin, as_completed
+
 from dask.distributed import Client, Variable , Queue , Lock ,LocalCluster
+
+from dask.distributed import worker_client
+
 from dask_jobqueue import SLURMCluster
-from dask.distributed import  utils_perf , as_completed
+from dask.distributed import  utils_perf
 import gc
 import dask
 import dask.bag as db
-from dask.distributed import as_completed
-
 import dask.array as da
 import dask.dataframe as dd
 from dask.delayed import delayed
 from dask import delayed, compute
 import argparse
 from datetime import datetime, timedelta
-
-
 import warnings
+from functools import wraps
 
 
+sys.setrecursionlimit( 10 **9 )
+parsbatch = 10
 
 ####small parsimony functions ##########
-def process_node_smallpars_1(node):
+def process_node_smallpars_1(node, count = 0 ):
+    sys.setrecursionlimit( 10 **9 )
+
     #go from leaves up and generate character sets
     if node.symbols is None:
         for child in node.child_nodes():
             if child.symbols is None:
-                process_node_smallpars_1(child)
+                if count < parsbatch:
+                    child = process_node_smallpars_1( child , count+1 )
+                else:
+                    with worker_client() as client:
+                        f = client.submit( process_node_smallpars_1, child , 0 )
+                        child = client.gather( f )
         node.symbols = { }
         node.scores = { }
+        
         for pos in child.symbols:
             symbols = set.intersection( * [ child.symbols[pos] for child in node.child_nodes( ) ] )
             if len(symbols) == 0:
@@ -61,10 +72,13 @@ def process_node_smallpars_1(node):
                 else:
                     score = min(  [ child.scores[pos][c] for child in node.child_nodes() ] )
                 node.scores[pos][c] = score
+        return node
 
-                
-def process_node_smallpars_2(node , verbose = False):
-    
+
+def process_node_smallpars_2(node , count =0 , verbose = False):
+
+    sys.setrecursionlimit( 10 **9 )
+
     #assign the most parsimonious char from children
     if node.char is None:
         if node.parent_node:
@@ -73,7 +87,6 @@ def process_node_smallpars_2(node , verbose = False):
             node.event = {}
             node.eventype= {}
             node.AAevent = None
-
             for pos in node.scores:
                 node.char[pos] = min(node.scores[pos], key=node.scores[pos].get)
                 if node.parent_node.char[pos] == node.char[pos]:
@@ -109,14 +122,15 @@ def process_node_smallpars_2(node , verbose = False):
                 node.AA = 'G'
         #down one level
         for child in node.child_nodes():
-            if child.char is None:
-                process_node_smallpars_2(child)
+            if count < parsbatch:
+                child = process_node_smallpars_2( child , count + 1)
+            else:
+                with worker_client() as client:
+                    if child.char is None:
+                        f = client.submit( process_node_smallpars_2, child)
+                        child = client.gather(f)
+        return node
 
-def delayed_send(data):
-    return lzma.compress(pickle.dumps(data))
-
-def delayed_receive(data):
-    return pickle.loads( lzma.decompress(data) )
 
 def calculate_small_parsimony(tree ,  posvec  ,  bootstrap = None , position = 0 , alnfile = None ):
     #df is 3 columns of a codons
@@ -149,9 +163,7 @@ def calculate_small_parsimony(tree ,  posvec  ,  bootstrap = None , position = 0
                 l.scores[codonpos] = { c:10**10 for c in allowed_symbols }
                 l.symbols[codonpos] =  allowed_symbols
                 if l.aln_row and l.aln_row < alnmax and l.aln_row not in del_genomes:
-
                     char = alncol[ l.aln_row ]
-
                     if char.upper() in allowed_symbols:
                         l.symbols[codonpos] = { char }
                         l.scores[codonpos][char] = 0
@@ -162,28 +174,30 @@ def calculate_small_parsimony(tree ,  posvec  ,  bootstrap = None , position = 0
                     char = None
                     l.symbols[codonpos] =  allowed_symbols
                 l.char[codonpos] = min(l.scores[codonpos], key=l.scores[codonpos].get)
-        #upq
-        process_node_smallpars_1(t.seed_node)
-        #down
-        process_node_smallpars_2(t.seed_node)
-        #collect events
+        
+        #calculate smallpars updown
+        with worker_client() as client:
+            t = client.submit( process_node_smallpars_1, t.seed_node ) 
+            t = client.compute(t).result()
+            t = client.submit( process_node_smallpars_2, t )
+            t = client.compute(t).result()
         eventdict = {}
         AAeventindex = [ n.matrow for n in t.nodes() if n.AAevent  ]
         AAeventypes = [ n.AAevent for n in t.nodes() if n.AAevent  ]
         for codonpos,i in enumerate(t.seed_node.char):
             eventindex = [ n.matrow for n in t.nodes() if n.event[codonpos] > 0 ]
             eventtypes = [ n.eventype[codonpos] for n in t.nodes() if n.event[codonpos] > 0 ]
-
             if codonpos==0:
                 eventdict[i] = { 'type': eventtypes , 'index' : eventindex , 'AAeventindex':AAeventindex , 'AAeventypes': AAeventypes  }
             else:
                 eventdict[i] = { 'type': eventtypes , 'index' : eventindex , 'AAeventindex':[] , 'AAeventypes': [] }
-
-
             eventdict[i]['codon_pos'] = codonpos
             eventdict[i]['column'] = idx[0] + codonpos
         retdf = pd.DataFrame.from_dict(eventdict, orient = 'index' )
         retdfs.append(retdf)
+
+    del t
+    gc.collect()
     return retdfs
 
 ###compute spares matrics from results #######################################################################
@@ -220,6 +234,8 @@ if __name__ == '__main__':
     sys.setrecursionlimit( 10 **8 )
     ts = datetime.utcnow().isoformat()
 
+
+    '''
     parser=argparse.ArgumentParser()
     parser.add_argument('--tree', help='tree corresponding to the alignment',type = str)
     parser.add_argument('--aln', help='alignment corresponding to the tree',type = str)
@@ -229,27 +245,81 @@ if __name__ == '__main__':
     parser.add_argument('--overwrite', help='overwrite HDF5 of aln' , type = str)
     parser.add_argument('--verbose', help='overwrite HDF5 of aln' , type = str)
 
+    parser.add_argument('--reload', help='overwrite HDF5 of aln' , type = str)
+    parser.add_argument('--njobs', help='overwrite HDF5 of aln' , type = str)
+
+
     args = vars(parser.parse_args(sys.argv[1:]))
 
+
+
+
+    if args['tree']:
+        treefile = args['tree']
+    if args['aln']:
+        alnfile = args['aln']
+    if args['blastpath']:
+        taxfilter = args['blastpath']
+    if args['refproteome']:
+        taxmask = args['refproteome']
+
+    if args['reload']:
+        reload_file = args['reload']
+
+    if args['reload']:
+        reload_file = args['reload']
+    if args['reload']:
+        taxmask = args['refproteome']
+    if args['distributed']:
+        if args['distributed'] == 'True':
+            distributed_computation = True
+        else:
+            distributed_computation = False
+
+    if args['distributed']:
+        if args['distributed'] == 'True':
+            distributed_computation = True
+            njobs = 200
+        else:
+            distributed_computation = False
+            njobs = 10
+
+    if args['njobs']:
+            njobs = int(args['njobs'])
+
     print(args)
+
+    '''
+
     print('timestamp',ts)
     tag = 'small_test'
 
     #fraction of genomes to remove if jackknifing
     #bootstraps = [ .001 , .01, .1 , .5  ,  .9  , .99    ]
-    bootstraps = [ .25  ]
-    bootstrap_replicates = 5
+    bootstraps = [ None , .25  ]
+    bootstrap_replicates = [1 , 5]
 
     #defaults
 
     verbose = True
     
-    distributed_computation = False
-    
+    distributed_computation = True
+    njobs = 200 
+
 
     overwrite = False 
     overwrite_annot = False
     overwrite_index = False
+    overwrite_tree = False
+
+
+    #restart computation after failure
+    #reload_file = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/apr_4_2022/mmsa_2022-04-04/2022-04-04_masked.fa_02022-06-13T22:03:53.971781small_test_coevmats.pkl'
+    #startposition = 15708
+
+    reload_file = None
+    startposition = 0
+
 
     #number of replicates
     restart = None
@@ -259,8 +329,11 @@ if __name__ == '__main__':
     refproteodb = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/refproteome/covidrefproteome.fasta'
     #refproteodb = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/structs/covid_structs.fasta'
 
+
     alnfile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/apr_4_2022/mmsa_2022-04-04/2022-04-04_masked.fa'
     treefile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/apr_4_2022/GISAID-hCoV-19-phylogeny-2022-02-28/global.tree'
+    
+    #treefile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/feb_2021/GISAID-hCoV-19-phylogeny-2021-02-21/global.tree'
 
     #alnfile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/dec_7/2021-12-07_masked.fa'
     #treefile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/dec_7/global.tree'
@@ -277,20 +350,6 @@ if __name__ == '__main__':
     #treefile = '../validation_data/16s/16s_salaminWstruct_aln.fasta.treefile'
     #alnfile = '../validation_data/16s/16s_salaminWstruct_aln.fasta'
 
-
-    if args['tree']:
-        treefile = args['tree']
-    if args['aln']:
-        alnfile = args['aln']
-    if args['blastpath']:
-        taxfilter = args['blastpath']
-    if args['refproteome']:
-        taxmask = args['refproteome']
-    if args['distributed']:
-        if args['distributed'] == 'True':
-            distributed_computation = True
-        else:
-            distributed_computation = False
 
     #create distributed cluster
     #use blast based annotation to assign codons to column ranges
@@ -322,6 +381,9 @@ if __name__ == '__main__':
 
 
     print('preparing tree IDs')
+
+
+
     if os.path.exists( alnfile + '_IDs.pkl') and overwrite_index==False:
         with open( alnfile + '_IDs.pkl' , 'rb') as idxin:
             IDindex = pickle.loads(idxin.read())
@@ -331,7 +393,6 @@ if __name__ == '__main__':
         msa = SeqIO.parse(alnfile , format = 'fasta')
         #def clipID(ID):
         #    return ''.join( [ s +'|' for s in str(ID).split('|')[:-1] ])[:-1].replace('_',' ')
-        
         IDs = {i:clipID(rec.id) for i,rec in enumerate(msa)}
         IDindex = dict(zip( IDs.values() , IDs.keys() ) )
         print( [(t,IDindex[t]) for t in list(IDindex.keys())[0:10]] )
@@ -339,42 +400,52 @@ if __name__ == '__main__':
             idxout.write(pickle.dumps(IDindex))
     
     ###########################################init tree
-    print('reading tree')
-    tree = dendropy.Tree.get(
-        path=treefile,
-        schema='newick')
-    print('done')
+    if os.path.exists( alnfile +'preptree.pkl') and overwrite_tree==False:
+        print('reloading tree')
+        with open( alnfile +'preptree.pkl' , 'rb') as treein:
+            tree = pickle.loads(treein.read()) 
+        print('done')
+    else:
+        print('reading tree')
+        tree = dendropy.Tree.get(
+            path=treefile,
+            schema='newick')
+        print('done')
 
-    print('init blank tree for sankof')
-    #init the blank tree
-    missing = []
-    found = []
-    for i,n in enumerate(tree.nodes()):
-        n.matrow = i
-        n.symbols = None
-        n.scores = None
-        n.event = None
-        n.char = None
-        n.eventype = None
-        n.AAevent = 0
-    for i,l in enumerate(tree.leaf_nodes()):        
-        tax = str(l.taxon).replace("'" , '')
-        try:
-            l.aln_row = IDindex[tax]
-            found.append(tax)
-        except:
-            l.aln_row = None
-            missing.append(tax)
-        l.event = {}
-        l.scores = {}
-        l.symbols = {}
-        l.char= {}
-        l.calc = {}
-    print('missing leaves:' , len(missing))
-    found = set(found)
-    print('found leaves:', len(found))
-    print('out of n nodes:', len(tree.leaf_nodes()))
-    print('done')
+        print('init blank tree for sankof')
+        #init the blank tree
+        missing = []
+        found = []
+        for i,n in enumerate(tree.nodes()):
+            n.matrow = i
+            n.symbols = None
+            n.scores = None
+            n.event = None
+            n.char = None
+            n.eventype = None
+            n.AAevent = 0
+        for i,l in enumerate(tree.leaf_nodes()):        
+            tax = str(l.taxon).replace("'" , '')
+            try:
+                l.aln_row = IDindex[tax]
+                found.append(tax)
+            except:
+                l.aln_row = None
+                missing.append(tax)
+            l.event = {}
+            l.scores = {}
+            l.symbols = {}
+            l.char= {}
+            l.calc = {}
+        print('missing leaves:' , len(missing))
+        found = set(found)
+        print('found leaves:', len(found))
+        print('out of n nodes:', len(tree.leaf_nodes()))
+        print('done')
+
+        print('saving tree')
+        with open( alnfile +'preptree.pkl' ,  'wb') as treeout:
+            treeout.write( pickle.dumps(tree) )
 
     seq = IDs[100]
     with h5py.File(alnfile +'.h5', 'r') as hf:     
@@ -441,33 +512,32 @@ if __name__ == '__main__':
         annotation = pd.DataFrame.from_dict( dummy_annot , orient = 'index')
         positions = [ i for i in range(1,align_array.shape[0], 3 ) ]
 
+    positions = sorted(list(set(positions)))
+    print(annotation)
+    print( 'calcilating sankof on positions', positions[0:500] , '...' )
+    print('codons to calclulate:' , len(positions))
     print('flashing up a dask cluster')
     if distributed_computation == True:
-        NCORE = 2
-        njobs = 100
 
+
+        NCORE = 1
         print('deploying cluster')
         cluster = SLURMCluster(
-            walltime='8:00:00',
+            walltime='1:00:00',
             n_workers = njobs,
             cores=NCORE,
             processes = NCORE,
             interface='ib0',
-            memory="120GB" ,
+            memory="50GB" ,
             env_extra=[
-            'source /work/FAC/FBM/DBC/cdessim2/default/dmoi/miniconda/etc/profile.d/conda.sh',
+            'source /work/FAC/FBM/DBC/cdessim2/default/dmoi/condaenvs/etc/profile.d/conda.sh',
             'conda activate ML2'
             ],
             scheduler_options={'interface': 'ens2f0' }
         )
-
-
         print(cluster.job_script())
-        #cluster.adapt(minimum=10, maximum=30)
-        #cluster.scale(jobs=njobs)
-
-        cluster.adapt(minimum=80, maximum=200)
-
+        cluster.scale(jobs=10)
+        cluster.adapt(minimum=njobs, maximum=1000)
         time.sleep(5)
         print(cluster)
         print(cluster.dashboard_link)
@@ -475,9 +545,8 @@ if __name__ == '__main__':
         
     else:
         NCORE = 50
-        njobs = 1
         print('testing')
-        cluster = LocalCluster(n_workers = NCORE )
+        cluster = LocalCluster(n_workers = njobs )
         #cluster.adapt(minimum = 50,  maximum=NCORE)
         print(cluster.dashboard_link)
         client = Client(cluster)
@@ -486,66 +555,113 @@ if __name__ == '__main__':
     #######start the sankof algo here #######################
     print('starting sankof')
     row_index = IDindex
-    count =0
-    batch = 100
-    print('saving tree')
-    with open( alnfile +'preptree.pkl' ,  'wb') as treeout:
-        treeout.write( pickle.dumps(tree) )
+
+
     print('done')
     coordinates = []
+    while len(client.scheduler_info()['workers']) < 5:
+        time.sleep(5)
+        cluster.scale(jobs=njobs)
+        cluster.adapt(minimum=njobs, maximum=1000)
+        print('waiting for workers')
+
     with h5py.File(alnfile +'.h5', 'r') as hf:
         align_array = hf['MSA2array'] 
         retmatsize = ( len(tree.nodes()) ,align_array.shape[0]  )
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        for bootstrap in bootstraps:
-            for k in range(bootstrap_replicates):
-                if bootstrap is None:
-                    filename = alnfile +'_' + str(k) +ts+ tag  + '_coevmats.pkl' 
-                else:
-                    filename = alnfile +'_' + str(k) +ts+ tag + str(bootstrap ) + '_BS_coevmats.pkl' 
-                
-                positions_batch = []
-                futures = []
-                codonbatch = 10
-                
-                #indexing starts at 1 for blast
-                #####switch to sending the coordinates and masking for the matrix
-                for i,codon in enumerate(positions):
-                    if nucleotides_only == False:
-                        pos = [column_map[codon], column_map[codon+1] , column_map[codon+2]]
+        for bs , bootstrap in enumerate(bootstraps):
+            this_bootstrap_replicates = bootstrap_replicates[bs]
+            for k in range(this_bootstrap_replicates):
+                if reload_file == None:
+                    if bootstrap is None:
+                        filename = alnfile +'_' + str(k) +ts+ tag  + '_coevmats.pkl' 
                     else:
-                        pos = [codon + i for i in range(3) if codon +i < align_array.shape[0]]
-                    
-                    positions_batch.append(pos)
-                    #submit to futures
-                    if len(positions_batch) > codonbatch:
-                        res = client.submit( calculate_small_parsimony ,  alnfile +'preptree.pkl' ,  positions_batch  , bootstrap , codon , alnfile = alnfile)
-                        res = client.submit( compute_matrices , res , retmatsize)
-                        futures.append(res)
-                AAmat = None
-                NTmat = None
-                finished = as_completed(futures)
-                for i,f in enumerate(finished):
-                    retry = False
-                    try:
-                        mats = f.result()
-                    except:
-                        client.retry(f)
+                        filename = alnfile +'_' + str(k) +ts+ tag + str(bootstrap ) + '_BS_coevmats.pkl' 
+                else:
+                    filename = reload_file
+                    with open( filename , 'rb') as coevout:
+                        print('reloading' , filename)
+                        matricesAA, matricesNT  = pickle.loads( coevout.read() )
+                        print('loaded',(matricesAA, matricesNT ) )
+                print('working on ', filename)
+                fitch_inlist = []
+                positions_batch = []
 
-                    if retry == False:
-                        if AAmat:
-                            AAmat += mats[1]
-                        else:
-                            AAmat = mats[1]
-                        if NTmat:
-                            NTmat += mats[0]
-                        else:
-                            NTmat = mats[1]
-                        if i % 10 == 0:
-                            print(mats)
+               
+
+                with open( filename+'.logfile.txt' , 'w') as logout:
+                    logout.write('cluster link')
+                    logout.write(cluster.dashboard_link)
+                    logout.flush()
+                    computebatch = 1
+                    codonbatch = 5
+                    #indexing starts at 1 for blast
+                    #####switch to sending the coordinates and masking for the matrix
+                    results = []
+                    workbatch = []
+
+                    for i,codon in enumerate(positions):
+                        if ( reload_file is not None and len(positions) - i < startposition ) or reload_file is None:
+                            if nucleotides_only == False:
+                                pos = [column_map[codon], column_map[codon+1] , column_map[codon+2]]
+                            else:
+                                pos = [codon + i for i in range(3) if codon +i < align_array.shape[0]]
+                            positions_batch.append(pos)
+                        future = client.submit( calculate_small_parsimony , alnfile +'preptree.pkl' ,  positions_batch  , bootstrap , codon , alnfile = alnfile)
+                        workbatch.append(future)
+                        #loop here to compute results if q is too long
+                        if len ( workbatch )> computebatch:
+                            print('computing')
+
+                            ac = as_completed(workbatch)     
+
+                            fitch_inlist =  [f.result() for f in ac]
+
+                            print(fitch_inlist)
+
+                            delayed_mats = [ compute_matrices(df, retmatsize) for df in fitch_inlist ]
+                            delayed_mats = dask.compute( * fitch_inlist , retries = 100)
+                            AAbag = dask.bag.from_sequence([ m[1] for m in delayed_mats ]) 
+                            NTbag = dask.bag.from_sequence([ m[0] for m in delayed_mats ])
+                            if count ==0 :
+                                matricesAA = dask.compute(AAbag.sum())[0]
+                                matricesNT = dask.compute(NTbag.sum())[0]
+                            else:
+                                matricesAA += dask.compute(AAbag.sum())[0]
+                                matricesNT += dask.compute(NTbag.sum())[0]
+                            print(sparseND.argwhere(matricesAA))
+                            
+                            results = []
+                            workbatch = []
+
+                        if i % 50 == 0 and i > 0:
                             with open( filename , 'wb') as coevout:
                                 print(filename)
-                                print('saving',(matricesAA, matricesNT ) )
-                                coevout.write(pickle.dumps((matricesAA, matricesNT )))
+                                print(count, 'intermediate saving',(matricesAA, matricesNT , i ) )
+                                coevout.write(pickle.dumps((matricesAA, matricesNT , i )))
                                 print('done')
+                    #last batch
+                    while len( workbatch ) > 0:                        
+                            time.sleep(1)
+                            for f in workbatch:
+                                if f.done():
+                                    results.append(f)
+                                    workbatch.remove(f)
+                    fitch_inlist =  [f.result() for f in results]
+                    delayed_mats = [ compute_matrices(df, retmatsize) for df in fitch_inlist ]
+                    AAbag = dask.bag.from_delayed([  m[1] for m in delayed_mats ]) 
+                    NTbag = dask.bag.from_delayed([ m[0] for m in delayed_mats ])
+                    matricesAA += dask.compute(AAbag.sum())[0]
+                    matricesNT += dask.compute(NTbag.sum())[0]
+                    print(matricesAA)
+                    print(matricesNT)
+                    print(sparseND.argwhere(matricesAA))
+                    print('done')
+
+                    with open( filename , 'wb') as coevout:
+                        print(filename)
+                        print('saving',(matricesAA, matricesNT ) )
+                        coevout.write(pickle.dumps((matricesAA, matricesNT )))
+                        print('done')
+                    print('DONE!')

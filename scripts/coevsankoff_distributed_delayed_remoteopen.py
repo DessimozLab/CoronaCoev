@@ -61,9 +61,7 @@ def process_node_smallpars_1(node):
                     score = min(  [ child.scores[pos][c] for child in node.child_nodes() ] )
                 node.scores[pos][c] = score
 
-                
 def process_node_smallpars_2(node , verbose = False):
-    
     #assign the most parsimonious char from children
     if node.char is None:
         if node.parent_node:
@@ -152,9 +150,7 @@ def calculate_small_parsimony(tree ,  posvec  ,  bootstrap = None , position = 0
                 l.scores[codonpos] = { c:10**10 for c in allowed_symbols }
                 l.symbols[codonpos] =  allowed_symbols
                 if l.aln_row and l.aln_row < alnmax and l.aln_row not in del_genomes:
-
                     char = alncol[ l.aln_row ]
-
                     if char.upper() in allowed_symbols:
                         l.symbols[codonpos] = { char }
                         l.scores[codonpos][char] = 0
@@ -184,6 +180,9 @@ def calculate_small_parsimony(tree ,  posvec  ,  bootstrap = None , position = 0
             eventdict[i]['column'] = idx[0] + codonpos
         retdf = pd.DataFrame.from_dict(eventdict, orient = 'index' )
         retdfs.append(retdf)
+    
+    del t
+    gc.collect()
     return retdfs
 
 ###compute spares matrics from results #######################################################################
@@ -316,9 +315,9 @@ if __name__ == '__main__':
 
 
     alnfile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/apr_4_2022/mmsa_2022-04-04/2022-04-04_masked.fa'
-    #treefile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/apr_4_2022/GISAID-hCoV-19-phylogeny-2022-02-28/global.tree'
+    treefile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/apr_4_2022/GISAID-hCoV-19-phylogeny-2022-02-28/global.tree'
     
-    treefile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/feb_2021/GISAID-hCoV-19-phylogeny-2021-02-21/global.tree'
+    #treefile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/feb_2021/GISAID-hCoV-19-phylogeny-2021-02-21/global.tree'
 
     #alnfile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/dec_7/2021-12-07_masked.fa'
     #treefile = '/work/FAC/FBM/DBC/cdessim2/default/dmoi/datasets/covid_data/dec_7/global.tree'
@@ -501,7 +500,7 @@ if __name__ == '__main__':
             cores=NCORE,
             processes = NCORE,
             interface='ib0',
-            memory="10GB" ,
+            memory="70GB" ,
             env_extra=[
             'source /work/FAC/FBM/DBC/cdessim2/default/dmoi/condaenvs/etc/profile.d/conda.sh',
             'conda activate ML2'
@@ -537,6 +536,8 @@ if __name__ == '__main__':
     coordinates = []
     while len(client.scheduler_info()['workers']) < 10:
         time.sleep(5)
+        cluster.scale(jobs=njobs)
+        cluster.adapt(minimum=njobs, maximum=1000)
         print('waiting for workers')
 
     with h5py.File(alnfile +'.h5', 'r') as hf:
@@ -571,7 +572,7 @@ if __name__ == '__main__':
                     logout.flush()
 
                     computebatch = len(client.scheduler_info()['workers'])*NCORE
-                    codonbatch = 3
+                    codonbatch = 2
                     #indexing starts at 1 for blast
                     #####switch to sending the coordinates and masking for the matrix
                     for i,codon in enumerate(positions):
@@ -585,19 +586,14 @@ if __name__ == '__main__':
                                 res = calculate_small_parsimony( alnfile +'preptree.pkl' ,  positions_batch  , bootstrap , codon , alnfile = alnfile)
                                 fitch_inlist.append( compute_matrices(res , retmatsize) )
                                 positions_batch = []
-
-
-                           
-
-                            if len(fitch_inlist) == computebatch: 
-
-
+                            if len(fitch_inlist) == computebatch:
                                 logout.write('computing')
                                 logout.write('positions up to:'+str(codon))
                                 logout.write('codons up to:'+str(i))
                                 logout.flush()
                                 print('codon positions left to calclulate' , len(positions) - i )
                                 compute_count = 0
+                                #delayed_mats = dask.compute( * fitch_inlist , retries = 100)
                                 while True:
                                     try:
                                         print('computing')
@@ -612,9 +608,9 @@ if __name__ == '__main__':
                                         logout.write('retry :' + str(compute_count) )
                                         logout.flush()
                                         time.sleep(5)
-
                                         compute_count +=1
                                         print('retrying')
+                                
                                 AAbag = dask.bag.from_sequence([ m[1] for m in delayed_mats ]) 
                                 NTbag = dask.bag.from_sequence([ m[0] for m in delayed_mats ])
                                 if count ==0 :

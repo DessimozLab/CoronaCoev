@@ -300,7 +300,6 @@ with h5py.File("hashsigs_both.hdf5", "w") as f:
 pool.close()
 with open('lshforest_both.pkl' , 'wb') as forestout:
     forestout.write(pickle.dumps(forest))
-
 mapper = {}
 for i,col in enumerate(codons):
     mapper[i]= col
