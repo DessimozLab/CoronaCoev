@@ -11,5 +11,6 @@ source /work/FAC/FBM/DBC/cdessim2/default/dmoi/condaenvs/etc/profile.d/conda.sh
 conda activate ML2
 
 
+
 # Run Jupyter
-python coevsankoff_distributed_delayed_remoteopen.py
+python coevsankoff_distributed_nx.py
